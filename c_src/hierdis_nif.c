@@ -135,9 +135,11 @@ static ERL_NIF_TERM hierdis_make_response(ErlNifEnv* env, redisReply* r)
         case REDIS_REPLY_ERROR:
             term = hierdis_make_error(env, REDIS_REPLY_ERROR, r->str);
             freeReplyObject(r);
+            return term;
         default:
             term = hierdis_make_error(env, REDIS_REPLY_ERROR, "Unknown reply error.");
             freeReplyObject(r);
+            return term;
     }
     return enif_make_tuple2(env, ATOM_OK, term);
 };

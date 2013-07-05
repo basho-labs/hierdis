@@ -19,12 +19,21 @@ This should automatically build the `hiredis` dependencies and move the headers 
     $ erl -pa ebin/
     
     Eshell V5.9.1  (abort with ^G)
-    1> 
-    
-    2> 
-    
-    3> 
-    
+	1> {ok,C} = hierdis:connect_unix("/tmp/redis.sock").
+	{ok,<<>>}
+	2> hierdis:command(C, ["SET", "foo", "bar"]).
+	{ok,<<"OK">>}
+	3> hierdis:command(C, ["GET", "foo"]).
+	{ok,<<"bar">>}
+	4> hierdis:command(C, ["MSET" | ["key1", "1", "key2", "2", "key3", "3"]]).               
+	{ok,<<"OK">>}
+	5> hierdis:command(C, ["GET", "key1"]).                                                  
+	{ok,<<"1">>}
+	6> hierdis:command(C, ["GET", "key3"]).
+	{ok,<<"3">>}
+	7> hierdis:command(C, ["MGET" | ["key1", "key2", "key3"]]).  
+	{error,{redis_reply_error, "Array responses are currently unsupported by hierdis"}}
+	
 
 
 ## License
