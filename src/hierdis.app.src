@@ -1,0 +1,14 @@
+{application, hierdis, [
+  {description, "High-performance Erlang client for the Redis key-value store (NIF wrapping the hiredis C client)."},
+  {vsn, "0.1"},
+  {modules, [
+    hierdis,
+    hierdis_nif
+  ]},
+  {registered, []},
+  {applications, [
+    kernel,
+    stdlib
+  ]},
+  {env, []}
+]}.
