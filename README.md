@@ -32,7 +32,7 @@ This should automatically build the `hiredis` dependencies and move the headers 
 	6> hierdis:command(C, ["GET", "key3"]).
 	{ok,<<"3">>}
 	7> hierdis:command(C, ["MGET" | ["key1", "key2", "key3"]]).  
-	{error,{redis_reply_error, "Array responses are currently unsupported by hierdis"}}
+	{ok,[<<"1">>,<<"2">>,<<"3">>]}
 	
 
 
