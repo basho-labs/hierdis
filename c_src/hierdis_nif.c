@@ -21,34 +21,7 @@
 // TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-#include "erl_nif.h"
-#include "hiredis.h"
-#include "sds.h"
-
-static ErlNifResourceType* HIREDIS_CONTEXT_RESOURCE;
-typedef struct 
-{
-    redisContext *context;
-} hiredis_context_handle;
-
-static ErlNifResourceType* HIREDIS_REPLY_RESOURCE;
-typedef struct 
-{
-    redisReply *reply;
-} hiredis_reply_handle;
-
-
-ERL_NIF_TERM ATOM_OK;
-ERL_NIF_TERM ATOM_ERROR;
-ERL_NIF_TERM ATOM_BADARG;
-ERL_NIF_TERM ATOM_TRUE;
-ERL_NIF_TERM ATOM_FALSE;
-ERL_NIF_TERM ATOM_REDIS_ERR_IO;
-ERL_NIF_TERM ATOM_REDIS_ERR_EOF;
-ERL_NIF_TERM ATOM_REDIS_ERR_PROTOCOL;
-ERL_NIF_TERM ATOM_REDIS_ERR_OOM;
-ERL_NIF_TERM ATOM_REDIS_ERR_OTHER;
-ERL_NIF_TERM ATOM_REDIS_REPLY_ERROR;
+#include "hierdis_nif.h"
 
 static ERL_NIF_TERM hierdis_make_error(ErlNifEnv* env, int code, const char* reason)
 {
@@ -91,9 +64,27 @@ static ERL_NIF_TERM hierdis_make_binary_from_reply(ErlNifEnv* env, redisReply* r
     return term;
 }
 
+static ERL_NIF_TERM hierdis_make_binary_copy_from_reply(ErlNifEnv* env, redisReply* r)
+{
+    ERL_NIF_TERM term;
+    
+    unsigned char* buffer = enif_make_new_binary(env, r->len, &term);
+    memcpy(buffer, r->str, r->len);
+
+    return term;
+}
+
 static ERL_NIF_TERM hierdis_make_list_from_reply(ErlNifEnv* env, redisReply* r) 
 {
-    // Need a sane way to handle this.
+    ERL_NIF_TERM list[r->elements];
+
+    for(int i = 0; i < r->elements; i++)
+    {
+        list[i] = hierdis_make_response(env, r->element[i], true);
+    }
+
+    return enif_make_list_from_array(env, list, r->elements);
+    // Need a saner way to handle this.
     // The issue is that Redis can return nested arrays, which is fine.
     // But I can't just recursively call hierdis_make_response(ErlNifEnv* env, redisReply* r) to handle this,
     // Because of how memory management is handled.
@@ -106,23 +97,40 @@ static ERL_NIF_TERM hierdis_make_list_from_reply(ErlNifEnv* env, redisReply* r)
     //      2. Nested calls to  hierdis_make_binary_from_reply(ErlNifEnv* env, redisReply* r) need to make sure to rely
     //         on the top-most created binary resource for garbage collection in Erlang, but if the top-most resource is garbage
     //         collected then it will also destroy the nested binaries/replies when hiredis_reply_handle_dtor() is called.
-    return hierdis_make_error(env, ATOM_REDIS_REPLY_ERROR, "Array responses are currently unsupported by hierdis");
+    //
+    // So right now there are two paths.  Responses which don't contain lists will use memory references and the Erlang GC for
+    // garbage collection, and responses which do contain lists will use memcpy and manually clear memory on the C side.
 };
 
-static ERL_NIF_TERM hierdis_make_response(ErlNifEnv* env, redisReply* r)
+static ERL_NIF_TERM hierdis_make_response(ErlNifEnv* env, redisReply* r, bool as_copy)
 {
     ERL_NIF_TERM term;
 
     switch(r->type)
     {
         case REDIS_REPLY_STRING:
-            term = hierdis_make_binary_from_reply(env, r);
+            if(!as_copy)
+            {
+                term = hierdis_make_binary_from_reply(env, r);
+            }
+            else
+            {
+                term = hierdis_make_binary_copy_from_reply(env, r);
+            }
             break;
         case REDIS_REPLY_STATUS:
-            term = hierdis_make_binary_from_reply(env, r);
+            if(!as_copy)
+            {
+                term = hierdis_make_binary_from_reply(env, r);
+            }
+            else
+            {
+                term = hierdis_make_binary_copy_from_reply(env, r);
+            }
             break;
         case REDIS_REPLY_ARRAY:
             term = hierdis_make_list_from_reply(env, r);
+            freeReplyObject(r);
             break;
         case REDIS_REPLY_INTEGER:
             term = enif_make_int64(env, r->integer);
@@ -135,13 +143,13 @@ static ERL_NIF_TERM hierdis_make_response(ErlNifEnv* env, redisReply* r)
         case REDIS_REPLY_ERROR:
             term = hierdis_make_error(env, REDIS_REPLY_ERROR, r->str);
             freeReplyObject(r);
-            return term;
+            break;
         default:
             term = hierdis_make_error(env, REDIS_REPLY_ERROR, "Unknown reply error.");
             freeReplyObject(r);
-            return term;
     }
-    return enif_make_tuple2(env, ATOM_OK, term);
+    return term;
+    //return enif_make_tuple2(env, ATOM_OK, term);
 };
 
 static ERL_NIF_TERM connect(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) 
@@ -263,8 +271,6 @@ static ERL_NIF_TERM command(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
     if(enif_get_resource(env, argv[0], HIREDIS_CONTEXT_RESOURCE, (void**)&handle))
     {
-        ERL_NIF_TERM term;
-
         reply = redisCommandArgv(handle->context, args_size, args, arglens);
         if (handle->context != NULL && handle->context->err) 
         {
@@ -272,8 +278,7 @@ static ERL_NIF_TERM command(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         }
         else
         {
-            term = hierdis_make_response(env, reply);
-            return term;
+            return enif_make_tuple2(env, ATOM_OK, hierdis_make_response(env, reply, false));
         }
     }
     else
@@ -334,7 +339,6 @@ static ERL_NIF_TERM get_reply(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
 
     if(enif_get_resource(env, argv[0], HIREDIS_CONTEXT_RESOURCE, (void**)&handle))
     {
-        ERL_NIF_TERM term;
         void* reply;
 
         if(sdslen(handle->context->obuf) > 0) 
@@ -346,9 +350,7 @@ static ERL_NIF_TERM get_reply(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
             }
             else
             {
-                term = hierdis_make_response(env, (redisReply*)reply);
-                
-                return term;
+                return enif_make_tuple2(env, ATOM_OK, hierdis_make_response(env, (redisReply*)reply, false));
             }   
         }
         else
