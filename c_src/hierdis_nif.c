@@ -309,22 +309,15 @@ static ERL_NIF_TERM get_reply(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
     {
         void* reply;
 
-        if(sdslen(handle->context->obuf) > 0) 
+        redisGetReply(handle->context, &reply); 
+        if (handle->context != NULL && handle->context->err) 
         {
-            redisGetReply(handle->context, &reply); 
-            if (handle->context != NULL && handle->context->err) 
-            {
-                return hierdis_make_error(env, handle->context->err, handle->context->errstr);
-            }
-            else
-            {
-                return enif_make_tuple2(env, ATOM_OK, hierdis_make_response(env, (redisReply*)reply, false));
-            }   
+            return hierdis_make_error(env, handle->context->err, handle->context->errstr);
         }
         else
         {
-            return hierdis_make_error(env, REDIS_REPLY_ERROR, "Command buffer is empty.");
-        }
+            return enif_make_tuple2(env, ATOM_OK, hierdis_make_response(env, (redisReply*)reply, false));
+        }   
     }
     else
     {
