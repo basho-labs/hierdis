@@ -80,26 +80,10 @@ static ERL_NIF_TERM hierdis_make_list_from_reply(ErlNifEnv* env, redisReply* r)
 
     for(int i = 0; i < r->elements; i++)
     {
-        list[i] = hierdis_make_response(env, r->element[i], true);
+        list[i] = hierdis_make_response(env, r->element[i], false);
     }
 
     return enif_make_list_from_array(env, list, r->elements);
-    // Need a saner way to handle this.
-    // The issue is that Redis can return nested arrays, which is fine.
-    // But I can't just recursively call hierdis_make_response(ErlNifEnv* env, redisReply* r) to handle this,
-    // Because of how memory management is handled.
-    // 
-    // Calls to hierdis_make_binary_from_reply(ErlNifEnv* env, redisReply* r) rely on creating an ErlNifResource
-    // for handling memory management by offloading responsibility to the Erlang GC.
-    // This introduces the following caveats:
-    //      1. Nested Integer, Nil, and Error responses will call freeReplyObject(r) on the nested sub-replies
-    //         which is a no-no according to hiredis docs.  https://github.com/redis/hiredis#using-replies
-    //      2. Nested calls to  hierdis_make_binary_from_reply(ErlNifEnv* env, redisReply* r) need to make sure to rely
-    //         on the top-most created binary resource for garbage collection in Erlang, but if the top-most resource is garbage
-    //         collected then it will also destroy the nested binaries/replies when hiredis_reply_handle_dtor() is called.
-    //
-    // So right now there are two paths.  Responses which don't contain lists will use memory references and the Erlang GC for
-    // garbage collection, and responses which do contain lists will use memcpy and manually clear memory on the C side.
 };
 
 static ERL_NIF_TERM hierdis_make_response(ErlNifEnv* env, redisReply* r, bool as_copy)
@@ -109,44 +93,28 @@ static ERL_NIF_TERM hierdis_make_response(ErlNifEnv* env, redisReply* r, bool as
     switch(r->type)
     {
         case REDIS_REPLY_STRING:
-            if(!as_copy)
-            {
-                term = hierdis_make_binary_from_reply(env, r);
-            }
-            else
-            {
-                term = hierdis_make_binary_copy_from_reply(env, r);
-            }
-            break;
         case REDIS_REPLY_STATUS:
-            if(!as_copy)
-            {
-                term = hierdis_make_binary_from_reply(env, r);
-            }
-            else
-            {
-                term = hierdis_make_binary_copy_from_reply(env, r);
-            }
+            term = hierdis_make_binary_from_reply(env, r);
             break;
         case REDIS_REPLY_ARRAY:
             term = hierdis_make_list_from_reply(env, r);
-            freeReplyObject(r);
+            hierdis_free_reply(r);
             break;
         case REDIS_REPLY_INTEGER:
             term = enif_make_int64(env, r->integer);
-            freeReplyObject(r);
+            hierdis_free_reply(r);
             break;
         case REDIS_REPLY_NIL:
             term = enif_make_atom(env, "undefined\0");
-            freeReplyObject(r);
+            hierdis_free_reply(r);
             break;
         case REDIS_REPLY_ERROR:
             term = hierdis_make_error(env, REDIS_REPLY_ERROR, r->str);
-            freeReplyObject(r);
+            hierdis_free_reply(r);
             break;
         default:
             term = hierdis_make_error(env, REDIS_REPLY_ERROR, "Unknown reply error.");
-            freeReplyObject(r);
+            hierdis_free_reply(r);
     }
     return term;
     //return enif_make_tuple2(env, ATOM_OK, term);
@@ -377,18 +345,34 @@ static ErlNifFunc nif_funcs[] =
     {"get_reply", 1, get_reply}
 };
 
+void hierdis_free_reply(void *reply)
+{
+    redisReply *r = reply;
+
+    switch(r->type) {
+    case REDIS_REPLY_INTEGER:
+        break; /* Nothing to free */
+    case REDIS_REPLY_ARRAY: // Removed the recursive free behavior, because we're allowing Erlang to do GC instead.
+    case REDIS_REPLY_ERROR:
+    case REDIS_REPLY_STATUS:
+    case REDIS_REPLY_STRING:
+        if (r->str != NULL)
+            free(r->str);
+        break;
+    }
+    free(r);
+}
+
 void hiredis_context_handle_dtor(ErlNifEnv* env, void* arg)
 {
     hiredis_context_handle* handle = (hiredis_context_handle*)arg;
     redisFree(handle->context);
-    handle = NULL;
 }
 
 void hiredis_reply_handle_dtor(ErlNifEnv* env, void* arg)
 {
     hiredis_reply_handle* handle = (hiredis_reply_handle*)arg;
-    freeReplyObject(handle->reply);
-    handle = NULL;
+    hierdis_free_reply(handle->reply);
 }
 
 static int on_nif_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info) 

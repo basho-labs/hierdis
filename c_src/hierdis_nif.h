@@ -68,6 +68,7 @@ static ERL_NIF_TERM append_command(ErlNifEnv* env, int argc, const ERL_NIF_TERM 
 
 static ERL_NIF_TERM get_reply(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
 
+void hierdis_free_reply(void *reply);
 void hiredis_context_handle_dtor(ErlNifEnv* env, void* arg);
 void hiredis_reply_handle_dtor(ErlNifEnv* env, void* arg);
 
