@@ -2,8 +2,7 @@
 
 High-performance Erlang client for the Redis key-value store.
 
-hierdis presents a simple API similar to the synchronous API exposed by the well-known [hiredis](https://github.com/redis/hiredis) C client.  This is done by exposing hiredis C client functionality to Erlang through the NIF interface.
-
+hierdis presents a simple API similar to the synchronous API exposed by the well-known [hiredis](https://github.com/redis/hiredis) C client.  This is done by exposing hiredis C client functionality to Erlang through the NIF interface.  Using this approach also allows hierdis to communicate with Redis via unix domain sockets, which can provide a 50% increase in throughput over TCP.
 
 ## Installation
 
