@@ -47,28 +47,27 @@ init() ->
 
 
 -spec connect(Ip::string(), Port::integer()) -> {atom(), binary()} | error().
-connect(Ip, Port) ->
+connect(_Ip, _Port) ->
     erlang:nif_error({error, not_loaded}).
 -spec connect(Ip::string(), Port::integer(), Timeout::integer()) -> {atom(), binary()} | error().
-connect(Ip, Port, Timeout) ->
+connect(_Ip, _Port, _Timeout) ->
     erlang:nif_error({error, not_loaded}).
 
 -spec connect_unix(SocketPath::string()) -> {atom(), binary()} | error().
-connect_unix(SocketPath) ->
+connect_unix(_SocketPath) ->
     erlang:nif_error({error, not_loaded}).
 -spec connect_unix(SocketPath::string(), Timeout::integer()) -> {atom(), binary()} | error().
-connect_unix(SocketPath, Timeout) ->
+connect_unix(_SocketPath, _Timeout) ->
     erlang:nif_error({error, not_loaded}).
 
 -spec command(Context::binary(), CommandArgs::iolist()) -> {atom(), binary()} | error().
-command(Context, CommandArgs) ->
+command(_Context, _CommandArgs) ->
 	erlang:nif_error({error, not_loaded}).
 
 -spec append_command(Context::binary(), CommandArgs::iolist()) -> {atom(), integer()} | error().
-append_command(Context, CommandArgs) ->
+append_command(_Context, _CommandArgs) ->
     erlang:nif_error({error, not_loaded}).
 
 -spec get_reply(Context::binary()) -> {atom(), binary()} | error().
-get_reply(Context) ->
+get_reply(_Context) ->
 	erlang:nif_error({error, not_loaded}).
-
