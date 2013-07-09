@@ -108,16 +108,11 @@ static ERL_NIF_TERM hierdis_make_response(ErlNifEnv* env, redisReply* r, bool as
             term = enif_make_atom(env, "undefined\0");
             hierdis_free_reply(r);
             break;
-        case REDIS_REPLY_ERROR:
-            term = hierdis_make_error(env, REDIS_REPLY_ERROR, r->str);
-            hierdis_free_reply(r);
-            break;
         default:
             term = hierdis_make_error(env, REDIS_REPLY_ERROR, "Unknown reply error.");
             hierdis_free_reply(r);
     }
     return term;
-    //return enif_make_tuple2(env, ATOM_OK, term);
 };
 
 static ERL_NIF_TERM connect(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) 
@@ -244,6 +239,10 @@ static ERL_NIF_TERM command(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         {
             return hierdis_make_error(env, handle->context->err, handle->context->errstr);
         }
+        else if(reply->type == REDIS_REPLY_ERROR)
+        {
+            return hierdis_make_error(env, REDIS_REPLY_ERROR, reply->str);
+        }
         else
         {
             return enif_make_tuple2(env, ATOM_OK, hierdis_make_response(env, reply, false));
@@ -307,12 +306,16 @@ static ERL_NIF_TERM get_reply(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
 
     if(enif_get_resource(env, argv[0], HIREDIS_CONTEXT_RESOURCE, (void**)&handle))
     {
-        void* reply;
+        redisReply* reply;
 
-        redisGetReply(handle->context, &reply); 
+        redisGetReply(handle->context, (void*)&reply); 
         if (handle->context != NULL && handle->context->err) 
         {
             return hierdis_make_error(env, handle->context->err, handle->context->errstr);
+        }
+        else if(reply->type == REDIS_REPLY_ERROR)
+        {
+            return hierdis_make_error(env, REDIS_REPLY_ERROR, reply->str);
         }
         else
         {
