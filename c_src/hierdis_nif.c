@@ -124,7 +124,7 @@ static ERL_NIF_TERM connect(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     }
 
-    char ip[length];
+    char ip[length+1];
     int port;
     int timeout;
 
@@ -169,7 +169,7 @@ static ERL_NIF_TERM connect_unix(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
         return enif_make_badarg(env);
     }
 
-    char socket_path[length];
+    char socket_path[length+1];
     int timeout;
 
     if(enif_get_string(env, argv[0], socket_path, length+1, ERL_NIF_LATIN1))
