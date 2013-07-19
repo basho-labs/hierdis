@@ -24,7 +24,7 @@ case "$1" in
 	#clone hiredis to ./c_src/hiredis from git@github.com:redis/hiredis.git
 	cd c_src
 
-        [ -d hiredis ] || git clone git@github.com:redis/hiredis.git
+        [ -d hiredis ] || git clone https://github.com/redis/hiredis.git
         cd hiredis
         git checkout $HIREDIS_VSN
 
