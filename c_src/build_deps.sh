@@ -16,8 +16,8 @@ MAKE=${MAKE:-make}
 
 case "$1" in
     clean)
-	# rm ./c_src/hiredis
-	rm -rf $ROOT/c_src/hiredis
+	    # rm ./c_src/hiredis
+	    rm -rf $ROOT/c_src/hiredis
         ;;
 
     get-deps)
@@ -34,16 +34,15 @@ case "$1" in
     *)
         #build hiredis and install lib to ./priv/hiredis
         export LDFLAGS=`echo $LDFLAGS | sed -e 's/-L.*-lhiredis//'`
-        export CFLAGS="$CFLAGS -arch x86_64 -m64"
         cd $ROOT/c_src/hiredis && make
 
-	# rm -rf $ROOT/priv/hiredis
-	# mkdir -p $ROOT/priv/hiredis
-	# cp $ROOT/c_src/hiredis/*.h $ROOT/priv/hiredis
-	# cp $ROOT/c_src/hiredis/*.o $ROOT/priv/hiredis
-	# cp $ROOT/c_src/hiredis/*.a $ROOT/priv/hiredis
-	# cp $ROOT/c_src/hiredis/*.dylib $ROOT/priv/hiredis
+    	# rm -rf $ROOT/priv/hiredis
+    	# mkdir -p $ROOT/priv/hiredis
+    	# cp $ROOT/c_src/hiredis/*.h $ROOT/priv/hiredis
+    	# cp $ROOT/c_src/hiredis/*.o $ROOT/priv/hiredis
+    	# cp $ROOT/c_src/hiredis/*.a $ROOT/priv/hiredis
+    	# cp $ROOT/c_src/hiredis/*.dylib $ROOT/priv/hiredis
 
-	cd $ROOT
+    	cd $ROOT
         ;;
 esac
