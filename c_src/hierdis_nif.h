@@ -56,16 +56,16 @@ ERL_NIF_TERM ATOM_REDIS_REPLY_ERROR;
 
 static ERL_NIF_TERM hierdis_make_error(ErlNifEnv* env, int code, const char* reason);
 static ERL_NIF_TERM hierdis_make_binary_from_reply(ErlNifEnv* env, redisReply* r);
-static ERL_NIF_TERM hierdis_make_binary_copy_from_reply(ErlNifEnv* env, redisReply* r);
 static ERL_NIF_TERM hierdis_make_list_from_reply(ErlNifEnv* env, redisReply* r);
 static ERL_NIF_TERM hierdis_make_response(ErlNifEnv* env, redisReply* r, bool as_copy);
+static void list_to_hiredis_argv(ErlNifEnv* env, ERL_NIF_TERM list, unsigned int argc, const char* argv[], size_t argv_lengths[]);
 
 static ERL_NIF_TERM connect(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);;
 static ERL_NIF_TERM connect_unix(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
 
 static ERL_NIF_TERM command(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
-static ERL_NIF_TERM append_command(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
 
+static ERL_NIF_TERM append_command(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
 static ERL_NIF_TERM get_reply(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
 
 void hierdis_free_reply(void *reply);

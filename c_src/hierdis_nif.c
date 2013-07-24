@@ -193,38 +193,42 @@ static ERL_NIF_TERM connect_unix(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
     }
 };
 
+static void list_to_hiredis_argv(ErlNifEnv* env, ERL_NIF_TERM list, unsigned int argc, const char* argv[], size_t argv_lengths[])
+{
+    ERL_NIF_TERM head, tail;
+    ErlNifBinary list_elm;
+
+    for(int i = 0; i < argc; i++)
+    {
+        enif_get_list_cell(env, list, &head, &tail);
+        enif_inspect_iolist_as_binary(env, head, &list_elm);
+        
+        argv[i] = (const char*)list_elm.data;
+        argv_lengths[i] = list_elm.size;
+
+        list = tail;
+    }
+};
+
 static ERL_NIF_TERM command(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) 
 {
     hiredis_context_handle* handle;
-    redisReply* reply; 
-
-    ERL_NIF_TERM list = argv[1];
-    ERL_NIF_TERM head, tail;
-    ErlNifBinary arg;
-    unsigned int args_size;
-
-    if (!enif_get_list_length(env, list, &args_size)) 
+    redisReply* reply;
+    unsigned int hiredis_argc;
+    
+    if (!enif_get_list_length(env, argv[1], &hiredis_argc)) 
     {
         return enif_make_badarg(env);    
     }
 
-    const char* args[args_size];
-    size_t arglens[args_size];
-
-    for(int i = 0; i < args_size; i++)
-    {
-        enif_get_list_cell(env, list, &head, &tail);
-        enif_inspect_iolist_as_binary(env, head, &arg);
-        
-        args[i] = (const char*)arg.data;
-        arglens[i] = arg.size;
-
-        list = tail;
-    }
+    const char* hiredis_argv[hiredis_argc];
+    size_t hiredis_argv_lengths[hiredis_argc];
 
     if(enif_get_resource(env, argv[0], HIREDIS_CONTEXT_RESOURCE, (void**)&handle))
     {
-        reply = redisCommandArgv(handle->context, args_size, args, arglens);
+        list_to_hiredis_argv(env, argv[1], hiredis_argc, hiredis_argv, hiredis_argv_lengths);
+        reply = redisCommandArgv(handle->context, hiredis_argc, hiredis_argv, hiredis_argv_lengths);
+        
         if (handle->context != NULL && handle->context->err) 
         {
             return hierdis_make_error(env, handle->context->err, handle->context->errstr);
@@ -247,34 +251,20 @@ static ERL_NIF_TERM command(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 static ERL_NIF_TERM append_command(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) 
 {
     hiredis_context_handle* handle;
-
-    ERL_NIF_TERM list = argv[1];
-    ERL_NIF_TERM head, tail;
-    ErlNifBinary arg;
-    unsigned int args_size;
-
-    if (!enif_get_list_length(env, list, &args_size)) 
+    unsigned int hiredis_argc;
+    
+    if (!enif_get_list_length(env, argv[1], &hiredis_argc)) 
     {
         return enif_make_badarg(env);    
     }
 
-    const char* args[args_size];
-    size_t arglens[args_size];
-
-    for(int i = 0; i < args_size; i++)
-    {
-        enif_get_list_cell(env, list, &head, &tail);
-        enif_inspect_iolist_as_binary(env, head, &arg);
-        
-        args[i] = (const char*)arg.data;
-        arglens[i] = arg.size;
-
-        list = tail;
-    }
+    const char* hiredis_argv[hiredis_argc];
+    size_t hiredis_argv_lengths[hiredis_argc];
 
     if(enif_get_resource(env, argv[0], HIREDIS_CONTEXT_RESOURCE, (void**)&handle))
     {
-        redisAppendCommandArgv(handle->context, args_size, args, arglens);
+        list_to_hiredis_argv(env, argv[1], hiredis_argc, hiredis_argv, hiredis_argv_lengths);
+        redisAppendCommandArgv(handle->context, hiredis_argc, hiredis_argv, hiredis_argv_lengths);
         if (handle->context != NULL && handle->context->err) 
         {
             return hierdis_make_error(env, handle->context->err, handle->context->errstr);
