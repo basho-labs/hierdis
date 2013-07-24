@@ -17,7 +17,7 @@ This should automatically build the `hiredis` dependencies and move the headers 
 
 ## Usage 
 
-Get a Redis connection.
+#####Get a Redis connection.
 
     $ erl -pa ebin/
     
@@ -25,7 +25,7 @@ Get a Redis connection.
 	1> {ok,C} = hierdis:connect_unix("/tmp/redis.sock").
 	{ok,<<>>}
 
-Issue commands to Redis as an `iolist`.
+#####Issue single commands to Redis as an `iolist`.
 
 	2> hierdis:command(C, ["SET", "foo", "bar"]).
 	{ok,<<"OK">>}
@@ -40,35 +40,60 @@ Issue commands to Redis as an `iolist`.
 	7> hierdis:command(C, ["MGET" | ["key1", "key2", "key3"]]).  
 	{ok,[<<"1">>,<<"2">>,<<"3">>]}
 
-Pipeline commands to Redis and get the replies.
+#####Pipeline commands to Redis as a `list` of `iolist`s.
 
-    8> hierdis:append_command(C, ["MULTI"]).
+    8> hierdis:pipeline(C, [
+    8>     ["SET", "foo", "bar"],
+    8>     ["GET", "foo"],
+    8>     ["MSET" | ["key1", "1", "key2", "2", "key3", "3"]],
+    8>     ["GET", "key1"],
+    8>     ["GET", "key3"],
+    8>     ["MGET" | ["key1", "key2", "key3"]]  
+    8> ]).
+    [{ok,<<"OK">>},
+     {ok,<<"bar">>},
+     {ok,<<"OK">>},
+     {ok,<<"1">>},
+     {ok,<<"3">>},
+     {ok,[<<"1">>,<<"2">>,<<"3">>]}]
+
+#####Execute a transaction pipeline against Redis as a `list` of `iolist`s.
+
+    9> hierdis:transaction(C, [ 
+    9>     ["SET", "foo", "bar"],
+    9>     ["GET", "foo"],
+    9>     ["MSET" | ["key1", "1", "key2", "2", "key3", "3"]],
+    9>     ["MGET" | ["key1", "key2", "key3"]]  
+    9> ]).
+    {ok,[<<"OK">>,<<"bar">>,<<"OK">>,[<<"1">>,<<"2">>,<<"3">>]]}
+    10> hierdis:transaction(C, [
+    10>     ["SET", "foo", "bar"],
+    10>     ["GET", "foo"],
+    10>     ["CRASHER!" | ["ka", "blooey"]],
+    10>     ["MGET" | ["key1", "key2", "key3"]]  
+    10> ]).
+    {error,{redis_reply_error,"EXECABORT Transaction discarded because of previous errors."}}
+    
+#####Manually append commands and get replies. 
+    11> hierdis:append_command(C, ["MULTI"]).
     {ok,15}
-    9> hierdis:append_command(C, ["SET", "foo", "pipelined"]).
+    12> hierdis:append_command(C, ["SET", "foo", "pipelined"]).
     {ok,52}
-    10> hierdis:append_command(C, ["SET", "bar", "linedpipe"]).
+    13> hierdis:append_command(C, ["SET", "bar", "linedpipe"]).
     {ok,89}
-    11> hierdis:append_command(C, ["SET", "baz", "ploplooned"]).
-    {ok,128}
-    12> hierdis:append_command(C, ["MGET", "foo", "bar", "baz"]).
-    {ok,169}
-    13> hierdis:append_command(C, ["EXEC"]).
+    14> hierdis:append_command(C, ["EXEC"]).
     {ok,183}
-    14> hierdis:get_reply(C).
-    {ok,<<"OK">>}
     15> hierdis:get_reply(C).
-    {ok,<<"QUEUED">>}
+    {ok,<<"OK">>}
     16> hierdis:get_reply(C).
     {ok,<<"QUEUED">>}
     17> hierdis:get_reply(C).
     {ok,<<"QUEUED">>}
     18> hierdis:get_reply(C).
-    {ok,<<"QUEUED">>}
-    19> hierdis:get_reply(C).
     {ok,[<<"OK">>,<<"OK">>,<<"OK">>,
          [<<"pipelined">>,<<"linedpipe">>,<<"ploplooned">>]]}
 
-Simple.
+#Simple. Right?
 
 ## License
 
