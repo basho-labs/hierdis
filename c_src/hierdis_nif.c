@@ -64,16 +64,6 @@ static ERL_NIF_TERM hierdis_make_binary_from_reply(ErlNifEnv* env, redisReply* r
     return term;
 }
 
-static ERL_NIF_TERM hierdis_make_binary_copy_from_reply(ErlNifEnv* env, redisReply* r)
-{
-    ERL_NIF_TERM term;
-    
-    unsigned char* buffer = enif_make_new_binary(env, r->len, &term);
-    memcpy(buffer, r->str, r->len);
-
-    return term;
-}
-
 static ERL_NIF_TERM hierdis_make_list_from_reply(ErlNifEnv* env, redisReply* r) 
 {
     ERL_NIF_TERM list[r->elements];
