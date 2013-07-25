@@ -18,7 +18,7 @@ This should automatically build the `hiredis` dependencies and move the headers 
 
 ## Performance Comparison
 
-On a MacBook Air equipped with a dual-core 2.0Ghz Core i7 CPU [hierdis](https://github.com/nathanaschbacher/hierdis) achieves __over 3x the throughput__ and sees __5x lower latency__ compared to [eredis](https://github.com/wooga/eredis) using 1 byte values.  When increasing the size of the stored values to 10k the performance of hierdis remained basically constant, and eredis performance cut in half.
+On a MacBook Air equipped with a dual-core 2.0Ghz Core i7 CPU [hierdis](https://github.com/nathanaschbacher/hierdis) achieves __over 3x the throughput__ and sees __5x lower latency__ compared to [eredis](https://github.com/wooga/eredis) using 1 byte values.  When increasing the size of the stored values to 10 kb the performance of hierdis remained basically constant, and eredis performance cut in half.
 
 ### hierdis _(~40k ops/sec, ~0.06ms Avg. GET and PUT)_
 
