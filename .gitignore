@@ -1,3 +1,4 @@
 *.o
 ebin
 *.so
+c_src/hiredis/
