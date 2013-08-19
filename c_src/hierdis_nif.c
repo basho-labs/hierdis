@@ -134,8 +134,9 @@ static ERL_NIF_TERM connect(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         
         if (handle->context != NULL && handle->context->err) 
         {
+            ERL_NIF_TERM error = hierdis_make_error(env, handle->context->err, handle->context->errstr);
             enif_release_resource(handle);
-            return hierdis_make_error(env, handle->context->err, handle->context->errstr);
+            return error;
         }
         else
         {
@@ -177,8 +178,9 @@ static ERL_NIF_TERM connect_unix(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
         
         if (handle->context != NULL && handle->context->err) 
         {
+            ERL_NIF_TERM error = hierdis_make_error(env, handle->context->err, handle->context->errstr);
             enif_release_resource(handle);
-            return hierdis_make_error(env, handle->context->err, handle->context->errstr);
+            return error;
         }
         else
         {
