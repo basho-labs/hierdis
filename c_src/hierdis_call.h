@@ -29,54 +29,35 @@
 #ifndef HIERDIS_CALL_H
 #define HIERDIS_CALL_H
 
-#include <erl_driver.h>
-#include <erl_interface.h>
-#include <string.h>
-#include "hierdis_port.h"
+#include "hierdis_drv_common.h"
+#include "hiredis_erl_driver.h"
 
 #define HIERDIS_CALL_CONNECT		0
 #define HIERDIS_CALL_CONNECT_UNIX	1
 #define HIERDIS_CALL_COMMAND		2
 #define HIERDIS_CALL_DISCONNECT		3
 
-typedef struct hierdis_call {
-	hierdis_port_t	*port;
-	unsigned int	cmd;
-	char		*buf;
-	ErlDrvSizeT	len;
-	int		idx;
-	char		*rbuf;
-	ErlDrvSizeT	rlen;
-	int		ridx;
-	int		olen;
-} hierdis_call_t;
-
-typedef struct hierdis_call_error {
-	hierdis_call_t	*call;
-	char		*atom;
-	int		atom_needs_free;
-	char		*reason;
-	int		reason_needs_free;
-} hierdis_call_error_t;
-
 hierdis_call_t	*hierdis_call_new(hierdis_port_t *port, unsigned int command, char *buf, ErlDrvSizeT len, char *rbuf, ErlDrvSizeT rlen);
 void		hierdis_call_free(hierdis_call_t *call);
 void		hierdis_call_execute(hierdis_call_t *call);
 
-void	hierdis_call_connect(hierdis_call_t *call);
-void	hierdis_call_connect_unix(hierdis_call_t *call);
+static void	hierdis_call_connect(hierdis_call_t *call);
+static void	hierdis_call_connect_unix(hierdis_call_t *call);
+static void	hierdis_call_command(hierdis_call_t *call);
+static void	hierdis_call_disconnect(hierdis_call_t *call);
+
+static void	hierdis_call_attach(hierdis_call_t *call, int with_timeout, unsigned long timeout);
+
+static sds	hierdis_call_decode_iolist(char *buffer, int *index, sds term);
+static void	hierdis_call_command_execute(hierdis_call_t *call, unsigned int hiredis_argc, const char* hiredis_argv[], size_t hiredis_argv_lengths[]);
+static void	hierdis_call_command_free(hierdis_call_t *call, unsigned int hiredis_argc, const char* hiredis_argv[], size_t hiredis_argv_lengths[]);
+static void	hierdis_call_command_write(hierdis_call_t *call);
 
 /*
  * Error functions
  */
-void		hierdis_call_badarg(hierdis_call_t *call);
-void		hierdis_call_make_error(hierdis_call_t *call, char *atom, int atom_needs_free, char *reason, int reason_needs_free);
-
-/*
- * Call Error functions
- */
-hierdis_call_error_t	*hierdis_call_error_new(hierdis_call_t *call, char *atom, int atom_needs_free, char *reason, int reason_needs_free);
-void			hierdis_call_error_free(hierdis_call_error_t *error);
-void			hierdis_call_error_write(hierdis_call_error_t *error);
+static void	hierdis_call_badarg(hierdis_call_t *call);
+static void	hierdis_call_error(hierdis_call_t *call, char *atom, char *reason);
+static void	hierdis_call_redis_error(hierdis_call_t *call, int code, const char *reason);
 
 #endif

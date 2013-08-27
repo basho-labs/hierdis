@@ -3,12 +3,16 @@
   {vsn, "0.2.1"},
   {modules, [
     hierdis,
-    hierdis_nif
+    hierdis_app,
+    hierdis_nif,
+    hierdis_port,
+    hierdis_sup
   ]},
   {registered, []},
   {applications, [
     kernel,
     stdlib
   ]},
+  {mod, {hierdis_app, []}},
   {env, []}
 ]}.

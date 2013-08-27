@@ -29,12 +29,7 @@
 #ifndef __HIREDIS_ERL_DRIVER_H__
 #define __HIREDIS_ERL_DRIVER_H__
 
-#include <erl_driver.h>
-#include <erl_interface.h>
-#include <string.h>
-#include <stdio.h>
-#include "hiredis.h"
-#include "async.h"
+#include "hierdis_drv_common.h"
 
 typedef struct redisErlDriverEvents {
 	redisAsyncContext	*context;
@@ -44,98 +39,11 @@ typedef struct redisErlDriverEvents {
 	int			events;
 } redisErlDriverEvents;
 
-static void
-redisErlDriverAddRead(void *privdata)
-{
-	redisErlDriverEvents *p;
-
-	fprintf(stdout, "ADD READ\n");
-
-	p = (redisErlDriverEvents *)privdata;
-	p->events |= ERL_DRV_READ;
-	driver_select(p->drv_port, p->drv_event, p->events, 1);
-}
-
-static void
-redisErlDriverDelRead(void *privdata)
-{
-	redisErlDriverEvents *p;
-
-	fprintf(stdout, "DEL READ\n");
-
-	p = (redisErlDriverEvents *)privdata;
-	p->events &= ~ERL_DRV_READ;
-	driver_select(p->drv_port, p->drv_event, ERL_DRV_READ, 0);
-}
-
-static void
-redisErlDriverAddWrite(void *privdata)
-{
-	redisErlDriverEvents *p;
-
-	fprintf(stdout, "ADD WRITE\n");
-
-	p = (redisErlDriverEvents *)privdata;
-	p->events |= ERL_DRV_WRITE;
-	driver_select(p->drv_port, p->drv_event, p->events, 1);
-}
-
-static void
-redisErlDriverDelWrite(void *privdata)
-{
-	redisErlDriverEvents *p;
-
-	fprintf(stdout, "DEL WRITE\n");
-
-	p = (redisErlDriverEvents *)privdata;
-	p->events &= ~ERL_DRV_WRITE;
-	driver_select(p->drv_port, p->drv_event, ERL_DRV_WRITE, 0);
-}
-
-static void
-redisErlDriverCleanup(void *privdata)
-{
-	redisErlDriverEvents *p;
-
-	fprintf(stdout, "CLEANUP\n");
-
-	p = (redisErlDriverEvents *)privdata;
-	driver_select(p->drv_port, p->drv_event, ERL_DRV_USE, 0);
-}
-
-static int
-redisErlDriverAttach(redisAsyncContext *ac, ErlDrvPort port, ErlDrvData data)
-{
-	redisContext *c;
-	redisErlDriverEvents *p;
-
-	c = &(ac->c);
-
-	if (ac->ev.data != NULL) {
-		return REDIS_ERR;
-	}
-
-	ac->ev.addRead  = redisErlDriverAddRead;
-	ac->ev.delRead  = redisErlDriverDelRead;
-	ac->ev.addWrite = redisErlDriverAddWrite;
-	ac->ev.delWrite = redisErlDriverDelWrite;
-	ac->ev.cleanup  = redisErlDriverCleanup;
-
-	p = (redisErlDriverEvents *)(malloc(sizeof (redisErlDriverEvents)));
-
-	if (!p) {
-		return REDIS_ERR;
-	}
-
-	memset(p, 0, sizeof(*p));
-
-	ac->ev.data  = p;
-	p->context   = ac;
-	p->drv_data  = data;
-	p->drv_port  = port;
-	p->drv_event = (ErlDrvEvent)c->fd;
-
-	return REDIS_OK;
-}
+extern void	redisErlDriverAddRead(void *privdata);
+extern void	redisErlDriverDelRead(void *privdata);
+extern void	redisErlDriverAddWrite(void *privdata);
+extern void	redisErlDriverDelWrite(void *privdata);
+extern void	redisErlDriverCleanup(void *privdata);
+extern int	redisErlDriverAttach(redisAsyncContext *ac, ErlDrvPort port, ErlDrvData data);
 
 #endif

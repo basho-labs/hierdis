@@ -1,6 +1,9 @@
+%% -*- mode: erlang; tab-width: 4; indent-tabs-mode: 1; st-rulers: [70] -*-
+%% vim: ts=4 sw=4 ft=erlang noet
+
 % (The MIT License)
 
-% Copyright (c) 2013 Nathan Aschbacher
+% Copyright (c) 2013 Andrew Bennett
 
 % Permission is hereby granted, free of charge, to any person obtaining
 % a copy of this software and associated documentation files (the
@@ -21,11 +24,16 @@
 % TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 % SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
--type error() :: {error, {Code::atom(), Reason::string()}}.
--define(TRANSACTION_BEGIN, <<"MULTI">>).
--define(TRANSACTION_END, <<"EXEC">>).
+-module(hierdis_sup).
+-author('Andrew Bennett <andrew@pagodabox.com>').
+-behaviour(supervisor).
+-export([start_link/0]).
+-export([init/1]).
 
--define(HIERDIS_CALL_CONNECT,      0).
--define(HIERDIS_CALL_CONNECT_UNIX, 1).
--define(HIERDIS_CALL_COMMAND,      2).
--define(HIERDIS_CALL_DISCONNECT,   3).
+-define(CHILD(I, Type), {I,{I,start_link,[]},permanent,5000,Type,[I]}).
+
+start_link() ->
+	supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+
+init([]) ->
+	{ok, {{one_for_one, 10, 10}, [?CHILD(hierdis_async, worker)]}}.
