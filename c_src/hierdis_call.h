@@ -48,7 +48,7 @@ static void	hierdis_call_disconnect(hierdis_call_t *call);
 
 static void	hierdis_call_attach(hierdis_call_t *call, int with_timeout, unsigned long timeout);
 
-static sds	hierdis_call_decode_iolist(char *buffer, int *index, sds term);
+static sds	hierdis_call_decode_iolist(char *buffer, int *index, sds term, int is_iodata);
 static void	hierdis_call_command_execute(hierdis_call_t *call, unsigned int hiredis_argc, const char* hiredis_argv[], size_t hiredis_argv_lengths[]);
 static void	hierdis_call_command_free(hierdis_call_t *call, unsigned int hiredis_argc, const char* hiredis_argv[], size_t hiredis_argv_lengths[]);
 static void	hierdis_call_command_write(hierdis_call_t *call);

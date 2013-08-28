@@ -368,7 +368,7 @@ hierdis_call_attach(hierdis_call_t *call, int with_timeout, unsigned long timeou
  * Command Args functions
  */
 static sds
-hierdis_call_decode_iolist(char *buffer, int *index, sds term)
+hierdis_call_decode_iolist(char *buffer, int *index, sds term, int is_iodata)
 {
 	int type;
 	int size;
@@ -381,7 +381,7 @@ hierdis_call_decode_iolist(char *buffer, int *index, sds term)
 		return term;
 	}
 
-	if (sdslen(term) > 0) {
+	if (is_iodata == 1) {
 		byte = NULL;
 		byte = (char *)(driver_alloc((ErlDrvSizeT)(sizeof (char))));
 		if (byte == NULL) {
@@ -391,6 +391,7 @@ hierdis_call_decode_iolist(char *buffer, int *index, sds term)
 
 		if (ei_decode_char(buffer, index, byte) == 0) {
 			term = sdscatlen(term, byte, 1);
+			(void) driver_free(byte);
 			return term;
 		}
 	}
@@ -440,8 +441,8 @@ hierdis_call_decode_iolist(char *buffer, int *index, sds term)
 			(void) sdsfree(term);
 			return (sds)NULL;
 		}
-		for (i = 0; i < arity; i++) {
-			term = hierdis_call_decode_iolist(buffer, index, term);
+		for (i = 0; i <= arity; i++) {
+			term = hierdis_call_decode_iolist(buffer, index, term, 1);
 			if (term == NULL) {
 				break;
 			}
@@ -473,7 +474,7 @@ hierdis_call_command_execute(hierdis_call_t *call, unsigned int hiredis_argc,
 
 	for (i = 0; i < hiredis_argc; i++) {
 		term = sdsempty();
-		term = hierdis_call_decode_iolist(buffer, index, term);
+		term = hierdis_call_decode_iolist(buffer, index, term, 0);
 		if (term == NULL) {
 			(void) hierdis_call_badarg(call);
 			break;

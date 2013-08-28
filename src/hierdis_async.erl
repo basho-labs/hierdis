@@ -174,7 +174,7 @@ close(Socket) ->
 command(Socket, CommandArgs) ->
 	case controlling_process(Socket, self()) of
 		ok ->
-			case append_command(Socket, CommandArgs) of
+			try append_command(Socket, CommandArgs) of
 				{ok, _} ->
 					receive
 						{redis_message, Socket, {error, RedisMessageError}} ->
@@ -188,6 +188,10 @@ command(Socket, CommandArgs) ->
 					end;
 				CommandError ->
 					CommandError
+			catch
+				error:badarg ->
+					close(Socket),
+					{error, closed}
 			end;
 		ControlError ->
 			ControlError
@@ -196,15 +200,11 @@ command(Socket, CommandArgs) ->
 -spec append_command(Socket::port(), CommandArgs::iolist())
 	-> {atom(), binary()} | error().
 append_command(Socket, CommandArgs) ->
-	try erlang:port_call(Socket, ?HIERDIS_CALL_COMMAND, CommandArgs) of
+	case erlang:port_call(Socket, ?HIERDIS_CALL_COMMAND, CommandArgs) of
 		{ok, N} when is_integer(N) ->
 			{ok, N};
 		CommandError ->
 			{error, CommandError}
-	catch
-		error:badarg ->
-			close(Socket),
-			{error, closed}
 	end.
 
 -spec controlling_process(Socket::port(), Pid::pid())
