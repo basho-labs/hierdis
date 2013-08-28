@@ -33,6 +33,8 @@ redisErlDriverAddRead(void *privdata)
 {
 	redisErlDriverEvents *p;
 
+	TRACE_F(("redisErlDriverAddRead:%s:%d\n", __FILE__, __LINE__));
+
 	p = (redisErlDriverEvents *)privdata;
 	p->events |= ERL_DRV_READ;
 	p->events |= ERL_DRV_USE;
@@ -44,6 +46,8 @@ redisErlDriverDelRead(void *privdata)
 {
 	redisErlDriverEvents *p;
 
+	TRACE_F(("redisErlDriverDelRead:%s:%d\n", __FILE__, __LINE__));
+
 	p = (redisErlDriverEvents *)privdata;
 	p->events &= ~ERL_DRV_READ;
 	driver_select(p->drv_port, p->drv_event, ERL_DRV_READ, 0);
@@ -53,6 +57,8 @@ void
 redisErlDriverAddWrite(void *privdata)
 {
 	redisErlDriverEvents *p;
+
+	TRACE_F(("redisErlDriverAddWrite:%s:%d\n", __FILE__, __LINE__));
 
 	p = (redisErlDriverEvents *)privdata;
 	p->events |= ERL_DRV_WRITE;
@@ -64,6 +70,8 @@ void
 redisErlDriverDelWrite(void *privdata)
 {
 	redisErlDriverEvents *p;
+
+	TRACE_F(("redisErlDriverDelWrite:%s:%d\n", __FILE__, __LINE__));
 
 	p = (redisErlDriverEvents *)privdata;
 	p->events &= ~ERL_DRV_WRITE;
@@ -77,6 +85,9 @@ redisErlDriverCleanup(void *privdata)
 	ErlDrvPort drv_port;
 	ErlDrvEvent drv_event;
 	int events;
+	int kill;
+
+	TRACE_F(("redisErlDriverCleanup:%s:%d\n", __FILE__, __LINE__));
 
 	if (privdata == NULL) {
 		return;
@@ -87,10 +98,14 @@ redisErlDriverCleanup(void *privdata)
 	drv_port = p->drv_port;
 	drv_event = p->drv_event;
 	events = p->events;
+	kill = p->kill;
 	p->context->ev.data = NULL;
-	(void) free(p);
+	(void) driver_free(p);
 	p = NULL;
 	driver_select(drv_port, drv_event, events, 0);
+	if (kill == 1) {
+		driver_failure_eof(drv_port);
+	}
 }
 
 int
@@ -98,6 +113,8 @@ redisErlDriverAttach(redisAsyncContext *ac, ErlDrvPort port, ErlDrvData data)
 {
 	redisContext *c;
 	redisErlDriverEvents *p;
+
+	TRACE_F(("redisErlDriverAttach:%s:%d\n", __FILE__, __LINE__));
 
 	c = &(ac->c);
 
@@ -111,7 +128,7 @@ redisErlDriverAttach(redisAsyncContext *ac, ErlDrvPort port, ErlDrvData data)
 	ac->ev.delWrite = redisErlDriverDelWrite;
 	ac->ev.cleanup  = redisErlDriverCleanup;
 
-	p = (redisErlDriverEvents *)(malloc(sizeof (redisErlDriverEvents)));
+	p = (redisErlDriverEvents *)(driver_alloc(sizeof (redisErlDriverEvents)));
 
 	if (!p) {
 		return REDIS_ERR;
@@ -123,7 +140,7 @@ redisErlDriverAttach(redisAsyncContext *ac, ErlDrvPort port, ErlDrvData data)
 	p->context   = ac;
 	p->drv_data  = data;
 	p->drv_port  = port;
-	p->drv_event = (ErlDrvEvent)c->fd;
+	p->drv_event = (ErlDrvEvent)(c->fd);
 
 	return REDIS_OK;
 }

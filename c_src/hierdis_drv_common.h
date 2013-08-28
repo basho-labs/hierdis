@@ -31,6 +31,7 @@
 
 #include <erl_driver.h>
 #include <erl_interface.h>
+#include <unistd.h>
 #include <inttypes.h>
 #include <string.h>
 #include <stdio.h>
@@ -38,7 +39,7 @@
 #include "async.h"
 #include "sds.h"
 
-#define TRACE	1
+// #define TRACE	1
 #ifdef TRACE
 	#define TRACE_C(c)	do { putchar(c); fflush(stdout); } while (0)
 	#define TRACE_S(s)	do { fputs((s), stdout); fflush(stdout); } while (0)
@@ -64,6 +65,7 @@ typedef struct hierdis_port {
 
 extern hierdis_port_t	*hierdis_port_new(ErlDrvPort drv_port);
 extern void		hierdis_port_free(hierdis_port_t *port);
+extern void		hierdis_port_stop(hierdis_port_t *port);
 extern void		hierdis_port_read(hierdis_port_t *port);
 extern void		hierdis_port_write(hierdis_port_t *port);
 extern void		hierdis_port_timeout(hierdis_port_t *port);
@@ -111,12 +113,24 @@ typedef struct hierdis_drv_term_data {
 	ErlDrvTermData		am_redis_err_oom;
 	ErlDrvTermData		am_redis_err_other;
 	ErlDrvTermData		am_redis_err_timeout;
+
+	sds		str_ok;
+	sds		str_error;
+	sds		str_redis_err_context;
+	sds		str_redis_reply_error;
+	sds		str_redis_err_io;
+	sds		str_redis_err_eof;
+	sds		str_redis_err_protocol;
+	sds		str_redis_err_oom;
+	sds		str_redis_err_other;
+	sds		str_redis_err_timeout;
 } hierdis_drv_term_data_t;
 
 extern hierdis_drv_term_data_t	*hierdis_drv;
 extern ErlDrvMutex		*hierdis_mutex;
 
 #define HI_ATOM(NAME)		(ErlDrvTermData)(hierdis_drv->am_ ## NAME)
+#define HI_STRING(NAME)		(char *)(hierdis_drv->str_ ## NAME)
 
 #define HI_FAIL_BADSPEC(PORT)		(void)(driver_failure_atom(PORT, "bad_spec"))
 #define HI_FAIL_OOM(PORT)		(void)(driver_failure_atom(PORT, "out_of_memory"))

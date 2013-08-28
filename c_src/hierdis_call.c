@@ -90,7 +90,7 @@ hierdis_call_execute(hierdis_call_t *call)
 			break;
 		case HIERDIS_CALL_COMMAND:
 		case HIERDIS_CALL_DISCONNECT:
-			(void) hierdis_call_error(call, "redis_err_context", "USE: connect/2, connect/3, connect_unix/1, connect_unix/2");
+			(void) hierdis_call_error(call, HI_STRING(redis_err_context), "USE: connect/2, connect/3, connect_unix/1, connect_unix/2, controlling_process/2");
 			break;
 		default:
 			(void) hierdis_call_badarg(call);
@@ -100,7 +100,7 @@ hierdis_call_execute(hierdis_call_t *call)
 		switch (call->cmd) {
 		case HIERDIS_CALL_CONNECT:
 		case HIERDIS_CALL_CONNECT_UNIX:
-			(void) hierdis_call_error(call, "redis_err_context", "USE: command/1, disconnect/1");
+			(void) hierdis_call_error(call, HI_STRING(redis_err_context), "USE: command/2, append_command/2, close/1, controlling_process/2");
 			break;
 		case HIERDIS_CALL_COMMAND:
 			(void) hierdis_call_command(call);
@@ -301,7 +301,7 @@ hierdis_call_disconnect(hierdis_call_t *call)
 	}
 
 	ei_encode_version(NULL, length);
-	ei_encode_atom(NULL, length, "ok");
+	ei_encode_atom(NULL, length, HI_STRING(ok));
 
 	if ((int)call->rlen < *length) {
 		buffer = (char *)driver_realloc((void *)buffer, (ErlDrvSizeT)*length);
@@ -309,7 +309,7 @@ hierdis_call_disconnect(hierdis_call_t *call)
 	}
 
 	ei_encode_version(buffer, index);
-	ei_encode_atom(buffer, index, "ok");
+	ei_encode_atom(buffer, index, HI_STRING(ok));
 }
 
 static void
@@ -345,7 +345,7 @@ hierdis_call_attach(hierdis_call_t *call, int with_timeout, unsigned long timeou
 	}
 
 	ei_encode_version(NULL, length);
-	ei_encode_atom(NULL, length, "ok");
+	ei_encode_atom(NULL, length, HI_STRING(ok));
 
 	if ((int)call->rlen < *length) {
 		buffer = (char *)driver_realloc((void *)buffer, (ErlDrvSizeT)*length);
@@ -353,7 +353,7 @@ hierdis_call_attach(hierdis_call_t *call, int with_timeout, unsigned long timeou
 	}
 
 	ei_encode_version(buffer, index);
-	ei_encode_atom(buffer, index, "ok");
+	ei_encode_atom(buffer, index, HI_STRING(ok));
 
 	if (with_timeout == 1) {
 		call->port->timeout = timeout;
@@ -528,7 +528,7 @@ hierdis_call_command_write(hierdis_call_t *call)
 
 	ei_encode_version(NULL, length);
 	ei_encode_tuple_header(NULL, length, 2);
-	ei_encode_atom(NULL, length, "ok");
+	ei_encode_atom(NULL, length, HI_STRING(ok));
 	ei_encode_longlong(NULL, length, bufsize);
 
 	if ((int)call->rlen < *length) {
@@ -538,7 +538,7 @@ hierdis_call_command_write(hierdis_call_t *call)
 
 	ei_encode_version(buffer, index);
 	ei_encode_tuple_header(buffer, index, 2);
-	ei_encode_atom(buffer, index, "ok");
+	ei_encode_atom(buffer, index, HI_STRING(ok));
 	ei_encode_longlong(buffer, index, bufsize);
 }
 
@@ -564,7 +564,7 @@ hierdis_call_error(hierdis_call_t *call, char *atom, char *reason)
 
 	ei_encode_version(NULL, length);
 	ei_encode_tuple_header(NULL, length, 2);
-	ei_encode_atom(NULL, length, "error");
+	ei_encode_atom(NULL, length, HI_STRING(error));
 	ei_encode_tuple_header(NULL, length, 2);
 	ei_encode_atom(NULL, length, atom);
 	ei_encode_string(NULL, length, reason);
@@ -576,7 +576,7 @@ hierdis_call_error(hierdis_call_t *call, char *atom, char *reason)
 
 	ei_encode_version(buffer, index);
 	ei_encode_tuple_header(buffer, index, 2);
-	ei_encode_atom(buffer, index, "error");
+	ei_encode_atom(buffer, index, HI_STRING(error));
 	ei_encode_tuple_header(buffer, index, 2);
 	ei_encode_atom(buffer, index, atom);
 	ei_encode_string(buffer, index, reason);
@@ -592,22 +592,22 @@ hierdis_call_redis_error(hierdis_call_t *call, int code, const char *reason)
 
 	switch(code) {
 	case REDIS_REPLY_ERROR:
-		atom = "redis_reply_error";
+		atom = HI_STRING(redis_reply_error);
 		break;
 	case REDIS_ERR_IO:
-		atom = "redis_err_io";
+		atom = HI_STRING(redis_err_io);
 		break;
 	case REDIS_ERR_EOF:
-		atom = "redis_err_eof";
+		atom = HI_STRING(redis_err_eof);
 		break;
 	case REDIS_ERR_PROTOCOL:
-		atom = "redis_err_protocol";
+		atom = HI_STRING(redis_err_protocol);
 		break;
 	case REDIS_ERR_OOM:
-		atom = "redis_err_oom";
+		atom = HI_STRING(redis_err_oom);
 		break;
 	case REDIS_ERR_OTHER:
-		atom = "redis_err_other";
+		atom = HI_STRING(redis_err_other);
 		break;
 	default:
 		atom_code = sdscatprintf(sdsempty(), "redis_err_code_%d", code);
@@ -623,4 +623,6 @@ hierdis_call_redis_error(hierdis_call_t *call, int code, const char *reason)
 	if (atom_code != NULL) {
 		(void) sdsfree(atom_code);
 	}
+
+	driver_failure_eof(call->port->drv_port);
 }

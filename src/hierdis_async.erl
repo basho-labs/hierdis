@@ -78,18 +78,22 @@ connect(Ip, Port, Timeout) when Port > 0, Port =< 65535 ->
 					receive
 						{redis_opened, Socket} ->
 							{ok, Socket};
-						{redis_opened, Socket, Error} ->
-							erlang:port_close(Socket),
-							Error;
-						ReceiveError ->
-							{error, ReceiveError}
+						{redis_error, Socket, Error} ->
+							close(Socket),
+							receive
+								{redis_closed, Socket} ->
+									{error, Error}
+							after
+								0 ->
+									{error, Error}
+							end
 					end;
 				ConnectError ->
-					erlang:port_close(Socket),
+					close(Socket),
 					ConnectError
 			catch
 				error:badarg ->
-					erlang:port_close(Socket),
+					close(Socket),
 					{error, closed}
 			end;
 		LoadError ->
@@ -118,16 +122,22 @@ connect_unix(SocketPath, Timeout) ->
 					receive
 						{redis_opened, Socket} ->
 							{ok, Socket};
-						{redis_opened, Socket, Error} ->
-							erlang:port_close(Socket),
-							Error
+						{redis_error, Socket, Error} ->
+							close(Socket),
+							receive
+								{redis_closed, Socket} ->
+									{error, Error}
+							after
+								0 ->
+									{error, Error}
+							end
 					end;
 				ConnectError ->
-					erlang:port_close(Socket),
+					close(Socket),
 					ConnectError
 			catch
 				error:badarg ->
-					erlang:port_close(Socket),
+					close(Socket),
 					{error, closed}
 			end;
 		LoadError ->
@@ -167,12 +177,14 @@ command(Socket, CommandArgs) ->
 			case append_command(Socket, CommandArgs) of
 				{ok, _} ->
 					receive
+						{redis_message, Socket, {error, RedisMessageError}} ->
+							{error, RedisMessageError};
+						{redis_message, Socket, Message} ->
+							{ok, Message};
 						{redis_reply, Socket, {error, RedisReplyError}} ->
 							{error, RedisReplyError};
 						{redis_reply, Socket, Reply} ->
-							{ok, Reply};
-						ReceiveError ->
-							{error, ReceiveError}
+							{ok, Reply}
 					end;
 				CommandError ->
 					CommandError
@@ -191,7 +203,7 @@ append_command(Socket, CommandArgs) ->
 			{error, CommandError}
 	catch
 		error:badarg ->
-			catch erlang:port_close(Socket),
+			close(Socket),
 			{error, closed}
 	end.
 

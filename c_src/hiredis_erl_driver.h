@@ -37,6 +37,7 @@ typedef struct redisErlDriverEvents {
 	ErlDrvPort		drv_port;
 	ErlDrvEvent		drv_event;
 	int			events;
+	int			kill;
 } redisErlDriverEvents;
 
 extern void	redisErlDriverAddRead(void *privdata);

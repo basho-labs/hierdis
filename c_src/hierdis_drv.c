@@ -29,6 +29,8 @@
 #include "hierdis_drv.h"
 
 #define INIT_ATOM(NAME)		hierdis_drv->am_ ## NAME = driver_mk_atom(#NAME)
+#define INIT_STRING(NAME)	hierdis_drv->str_ ## NAME = sdsnew(#NAME)
+#define FREE_STRING(NAME)	do { (void) sdsfree(hierdis_drv->str_ ## NAME); } while (0)
 
 /*
  * Erlang DRV functions
@@ -36,6 +38,7 @@
 static int
 hierdis_drv_init(void)
 {
+	TRACE_F(("hierdis_drv_init:%s:%d\n", __FILE__, __LINE__));
 	hierdis_mutex = erl_drv_mutex_create("hierdis");
 
 	if (hierdis_drv == NULL) {
@@ -67,23 +70,48 @@ hierdis_drv_init(void)
 	INIT_ATOM(redis_err_other);
 	INIT_ATOM(redis_err_timeout);
 
+	INIT_STRING(ok);
+	INIT_STRING(error);
+	INIT_STRING(redis_err_context);
+	INIT_STRING(redis_reply_error);
+	INIT_STRING(redis_err_io);
+	INIT_STRING(redis_err_eof);
+	INIT_STRING(redis_err_protocol);
+	INIT_STRING(redis_err_oom);
+	INIT_STRING(redis_err_other);
+	INIT_STRING(redis_err_timeout);
+
 	return 0;
 }
 
 static void
 hierdis_drv_finish(void)
 {
-	if (hierdis_drv == NULL) {
-		return;
+	TRACE_F(("hierdis_drv_finish:%s:%d\n", __FILE__, __LINE__));
+	if (hierdis_drv != NULL) {
+		FREE_STRING(ok);
+		FREE_STRING(error);
+		FREE_STRING(redis_err_context);
+		FREE_STRING(redis_reply_error);
+		FREE_STRING(redis_err_io);
+		FREE_STRING(redis_err_eof);
+		FREE_STRING(redis_err_protocol);
+		FREE_STRING(redis_err_oom);
+		FREE_STRING(redis_err_other);
+		FREE_STRING(redis_err_timeout);
+		(void) driver_free(hierdis_drv);
+		hierdis_drv = NULL;
 	}
-
-	(void) driver_free(hierdis_drv);
-	(void) erl_drv_mutex_destroy(hierdis_mutex);
+	if (hierdis_mutex != NULL) {
+		(void) erl_drv_mutex_destroy(hierdis_mutex);
+		hierdis_mutex = NULL;
+	}
 }
 
 static ErlDrvData
 hierdis_drv_start(ErlDrvPort port, char *command)
 {
+	TRACE_F(("hierdis_drv_start:%s:%d\n", __FILE__, __LINE__));
 	hierdis_port_t *desc;
 
 	(void) command; // Unused
@@ -99,12 +127,14 @@ hierdis_drv_start(ErlDrvPort port, char *command)
 static void
 hierdis_drv_stop(ErlDrvData drv_data)
 {
-	(void) hierdis_port_free((hierdis_port_t *)drv_data);
+	TRACE_F(("hierdis_drv_stop:%s:%d\n", __FILE__, __LINE__));
+	(void) hierdis_port_stop((hierdis_port_t *)drv_data);
 }
 
 static void
 hierdis_drv_ready_input(ErlDrvData drv_data, ErlDrvEvent drv_event)
 {
+	TRACE_F(("hierdis_drv_ready_input:%s:%d (%d)\n", __FILE__, __LINE__, (int)drv_event));
 	(void) drv_event; // Unused
 
 	(void) hierdis_port_read((hierdis_port_t *)drv_data);
@@ -113,6 +143,7 @@ hierdis_drv_ready_input(ErlDrvData drv_data, ErlDrvEvent drv_event)
 static void
 hierdis_drv_ready_output(ErlDrvData drv_data, ErlDrvEvent drv_event)
 {
+	TRACE_F(("hierdis_drv_ready_output:%s:%d (%d)\n", __FILE__, __LINE__, (int)drv_event));
 	(void) drv_event; // Unused
 
 	(void) hierdis_port_write((hierdis_port_t *)drv_data);
@@ -121,6 +152,7 @@ hierdis_drv_ready_output(ErlDrvData drv_data, ErlDrvEvent drv_event)
 static void
 hierdis_drv_timeout(ErlDrvData drv_data)
 {
+	TRACE_F(("hierdis_drv_timeout:%s:%d\n", __FILE__, __LINE__));
 	(void) hierdis_port_timeout((hierdis_port_t *)drv_data);
 }
 
@@ -128,6 +160,7 @@ static ErlDrvSSizeT
 hierdis_drv_call(ErlDrvData drv_data, unsigned int command, char *buf, ErlDrvSizeT len,
 		char **rbuf, ErlDrvSizeT rlen, unsigned int *flags)
 {
+	TRACE_F(("hierdis_drv_call:%s:%d\n", __FILE__, __LINE__));
 	hierdis_call_t *call;
 	ErlDrvSSizeT olen;
 
@@ -146,10 +179,12 @@ hierdis_drv_call(ErlDrvData drv_data, unsigned int command, char *buf, ErlDrvSiz
 }
 
 static void
-hierdis_drv_stop_select(ErlDrvEvent event, void *reserved)
+hierdis_drv_stop_select(ErlDrvEvent drv_event, void *reserved)
 {
-	(void) event; // Unused
+	TRACE_F(("hierdis_drv_stop_select:%s:%d (%d)\n", __FILE__, __LINE__, (int)drv_event));
 	(void) reserved; // Unused
+
+	close((long)drv_event);
 }
 
 DRIVER_INIT(hierdis_drv)

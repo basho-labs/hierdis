@@ -71,6 +71,19 @@ hierdis_port_free(hierdis_port_t *port)
 }
 
 void
+hierdis_port_stop(hierdis_port_t *port)
+{
+	if (port == NULL) {
+		return;
+	}
+	if (port->context == NULL) {
+		(void) hierdis_port_free(port);
+		return;
+	}
+	(void) redisAsyncDisconnect(port->context);
+}
+
+void
 hierdis_port_read(hierdis_port_t *port)
 {
 	(void) redisAsyncHandleRead(port->context);
@@ -85,6 +98,8 @@ hierdis_port_write(hierdis_port_t *port)
 void
 hierdis_port_timeout(hierdis_port_t *port)
 {
+	struct redisAsyncContext *context;
+
 	if (port == NULL) {
 		return;
 	}
@@ -92,14 +107,19 @@ hierdis_port_timeout(hierdis_port_t *port)
 		return;
 	}
 
-	(void) hierdis_port_open_timeout(port);
+	context = port->context;
+	port->context->data = NULL;
+	port->context = NULL;
+	(void) hierdis_port_open_timeout(context, port);
 	(void) hierdis_port_closed(port);
+	driver_failure_eof(port->drv_port);
 }
 
 void
 hierdis_port_on_connect(const struct redisAsyncContext *context, int status)
 {
 	hierdis_port_t *port;
+	redisErlDriverEvents *p;
 
 	(void) status; // Unused
 
@@ -113,7 +133,13 @@ hierdis_port_on_connect(const struct redisAsyncContext *context, int status)
 	if ((port->flags & REDIS_CONNECTED) > 0) {
 		(void) hierdis_port_opened(port);
 	} else {
-		(void) hierdis_port_open_error(port);
+		if (port->context != NULL && port->context->ev.data != NULL) {
+			p = (redisErlDriverEvents *)(port->context->ev.data);
+			p->kill = 1;
+		}
+		port->context->data = NULL;
+		port->context = NULL;
+		(void) hierdis_port_open_error((struct redisAsyncContext *)context, port);
 		(void) hierdis_port_closed(port);
 	}
 }
@@ -129,11 +155,16 @@ hierdis_port_on_disconnect(const struct redisAsyncContext *context, int status)
 	port->flags = context->c.flags;
 	port->flags &= ~REDIS_IN_CALLBACK;
 
+	port->context->data = NULL;
+	port->context = NULL;
+
 	if (context->err || context->c.err) {
-		(void) hierdis_port_close_error(port);
+		(void) hierdis_port_close_error((struct redisAsyncContext *)context, port);
 		(void) hierdis_port_closed(port);
+		driver_failure_eof(port->drv_port);
 	} else {
 		(void) hierdis_port_closed(port);
+		driver_failure_eof(port->drv_port);
 	}
 }
 
@@ -268,38 +299,6 @@ hierdis_port_get_redis_error(int code)
 	return atom;
 }
 
-static sds
-hierdis_port_get_redis_error_string(int code)
-{
-	sds atom;
-
-	switch(code) {
-	case REDIS_REPLY_ERROR:
-		atom = sdsnew("redis_reply_error");
-		break;
-	case REDIS_ERR_IO:
-		atom = sdsnew("redis_err_io");
-		break;
-	case REDIS_ERR_EOF:
-		atom = sdsnew("redis_err_eof");
-		break;
-	case REDIS_ERR_PROTOCOL:
-		atom = sdsnew("redis_err_protocol");
-		break;
-	case REDIS_ERR_OOM:
-		atom = sdsnew("redis_err_oom");
-		break;
-	case REDIS_ERR_OTHER:
-		atom = sdsnew("redis_err_other");
-		break;
-	default:
-		atom = sdscatprintf(sdsempty(), "redis_err_code_%d", code);
-		break;
-	}
-
-	return atom;
-}
-
 static void
 hierdis_port_closed(hierdis_port_t *port)
 {
@@ -328,14 +327,14 @@ hierdis_port_closed(hierdis_port_t *port)
 }
 
 static void
-hierdis_port_close_error(hierdis_port_t *port)
+hierdis_port_close_error(struct redisAsyncContext *context, hierdis_port_t *port)
 {
 	ErlDrvTermData err;
 	char *errstr;
 	int errlen;
 	hierdis_port_spec_t *spec;
 
-	spec = spec_new((struct redisAsyncContext *)port->context, port);
+	spec = spec_new((struct redisAsyncContext *)context, port);
 	if (spec == NULL) {
 		HI_FAIL_OOM(port->drv_port);
 		return;
@@ -351,20 +350,20 @@ hierdis_port_close_error(hierdis_port_t *port)
 	spec->data[spec->index++] = ERL_DRV_PORT;
 	spec->data[spec->index++] = spec->port->term_port;
 
-	if (spec->context->err) {
-		err = hierdis_port_get_redis_error(spec->context->err);
-	} else if (spec->context->c.err) {
-		err = hierdis_port_get_redis_error(spec->context->c.err);
+	if (context->err) {
+		err = hierdis_port_get_redis_error(context->err);
+	} else if (context->c.err) {
+		err = hierdis_port_get_redis_error(context->c.err);
 	} else {
 		err = HI_ATOM(redis_err_other);
 	}
 
-	if (spec->context->errstr) {
-		errstr = spec->context->errstr;
-	} else if (spec->context->c.errstr) {
-		errstr = spec->context->c.errstr;
+	if (context->errstr) {
+		errstr = context->errstr;
+	} else if (context->c.errstr) {
+		errstr = context->c.errstr;
 	} else {
-		errstr = "Unknown error";
+		errstr = "ERR unknown close error";
 	}
 
 	errlen = strlen(errstr);
@@ -411,7 +410,7 @@ hierdis_port_opened(hierdis_port_t *port)
 }
 
 static void
-hierdis_port_open_error(hierdis_port_t *port)
+hierdis_port_open_error(struct redisAsyncContext *context, hierdis_port_t *port)
 {
 	ErlDrvTermData err;
 	char *errstr;
@@ -420,7 +419,7 @@ hierdis_port_open_error(hierdis_port_t *port)
 
 	spec = NULL;
 
-	spec = spec_new((struct redisAsyncContext *)port->context, port);
+	spec = spec_new((struct redisAsyncContext *)context, port);
 	if (spec == NULL) {
 		HI_FAIL_OOM(port->drv_port);
 		return;
@@ -436,28 +435,23 @@ hierdis_port_open_error(hierdis_port_t *port)
 	spec->data[spec->index++] = ERL_DRV_PORT;
 	spec->data[spec->index++] = spec->port->term_port;
 
-	if (spec->context->err) {
-		err = hierdis_port_get_redis_error(spec->context->err);
-		spec->port->err_atom = hierdis_port_get_redis_error_string(spec->context->err);
-	} else if (spec->context->c.err) {
-		err = hierdis_port_get_redis_error(spec->context->c.err);
-		spec->port->err_atom = hierdis_port_get_redis_error_string(spec->context->c.err);
+	if (context->err) {
+		err = hierdis_port_get_redis_error(context->err);
+	} else if (context->c.err) {
+		err = hierdis_port_get_redis_error(context->c.err);
 	} else {
 		err = HI_ATOM(redis_err_other);
-		spec->port->err_atom = hierdis_port_get_redis_error_string(REDIS_ERR_OTHER);
 	}
 
-	if (spec->context->errstr) {
-		errstr = spec->context->errstr;
-	} else if (spec->context->c.errstr) {
-		errstr = spec->context->c.errstr;
+	if (context->errstr) {
+		errstr = context->errstr;
+	} else if (context->c.errstr) {
+		errstr = context->c.errstr;
 	} else {
-		errstr = "Unknown error";
+		errstr = "ERR unknown open error";
 	}
 
 	errlen = strlen(errstr);
-
-	spec->port->err_reason = sdsnew(errstr);
 
 	spec->data[spec->index++] = ERL_DRV_ATOM;
 	spec->data[spec->index++] = err;
@@ -474,7 +468,7 @@ hierdis_port_open_error(hierdis_port_t *port)
 }
 
 static void
-hierdis_port_open_timeout(hierdis_port_t *port)
+hierdis_port_open_timeout(struct redisAsyncContext *context, hierdis_port_t *port)
 {
 	ErlDrvTermData err;
 	char *errstr;
@@ -483,7 +477,7 @@ hierdis_port_open_timeout(hierdis_port_t *port)
 
 	spec = NULL;
 
-	spec = spec_new((struct redisAsyncContext *)port->context, port);
+	spec = spec_new((struct redisAsyncContext *)context, port);
 	if (spec == NULL) {
 		HI_FAIL_OOM(port->drv_port);
 		return;
@@ -500,13 +494,10 @@ hierdis_port_open_timeout(hierdis_port_t *port)
 	spec->data[spec->index++] = spec->port->term_port;
 
 	err = HI_ATOM(redis_err_timeout);
-	spec->port->err_atom = sdsnew("redis_err_timeout");
 
-	errstr = sdscatprintf(sdsempty(), "Timeout after %" PRIu32 "ms while attempting to connect.", (uint32_t)port->timeout);
+	errstr = sdscatprintf(sdsempty(), "ERR Timeout after %" PRIu32 "ms while attempting to connect.", (uint32_t)port->timeout);
 
 	errlen = strlen(errstr);
-
-	spec->port->err_reason = sdsnew(errstr);
 
 	spec->data[spec->index++] = ERL_DRV_ATOM;
 	spec->data[spec->index++] = err;
@@ -542,34 +533,22 @@ hierdis_port_respond(hierdis_port_t *port, redisReply *reply, int subscribed)
 	}
 
 	spec->data[spec->index++] = ERL_DRV_ATOM;
-	if (reply == NULL) {
+	if (reply->type == REDIS_REPLY_ERROR) {
 		spec->data[spec->index++] = HI_ATOM(redis_error);
 	} else {
-		if (reply->type == REDIS_REPLY_ERROR) {
-			spec->data[spec->index++] = HI_ATOM(redis_error);
+		if (subscribed == 1) {
+			spec->data[spec->index++] = HI_ATOM(redis_message);
 		} else {
-			if (subscribed == 1) {
-				spec->data[spec->index++] = HI_ATOM(redis_message);
-			} else {
-				spec->data[spec->index++] = HI_ATOM(redis_reply);
-			}
+			spec->data[spec->index++] = HI_ATOM(redis_reply);
 		}
 	}
 	spec->data[spec->index++] = ERL_DRV_PORT;
 	spec->data[spec->index++] = port->term_port;
 
-	if (reply == NULL) {
-		if (hierdis_port_make_error_from_context(port->context, spec) < 0) {
-			(void) spec_free(spec);
-			HI_FAIL_OOM(port->drv_port);
-			return;
-		}
-	} else {
-		if (hierdis_port_make_term_from_reply(reply, spec) < 0) {
-			(void) spec_free(spec);
-			HI_FAIL_OOM(port->drv_port);
-			return;
-		}
+	if (hierdis_port_make_term_from_reply(reply, spec) < 0) {
+		(void) spec_free(spec);
+		HI_FAIL_OOM(port->drv_port);
+		return;
 	}
 
 	if (fix_spec(spec, (ErlDrvSizeT)(spec->index + 2)) < 0) {
@@ -598,49 +577,6 @@ hierdis_port_output(hierdis_port_spec_t *spec)
 		(void) spec_free(spec);
 		break;
 	}
-}
-
-static int
-hierdis_port_make_error_from_context(struct redisAsyncContext *context, hierdis_port_spec_t *spec)
-{
-	char *errstr;
-	int errlen;
-
-	if (fix_spec(spec, (ErlDrvSizeT)(spec->index + 7)) < 0) {
-		return -1;
-	}
-
-	spec->data[spec->index++] = ERL_DRV_ATOM;
-
-	if (context->err) {
-		spec->data[spec->index++] = hierdis_port_get_redis_error(context->err);
-		spec->port->err_atom = hierdis_port_get_redis_error_string(context->err);
-	} else if (context->c.err) {
-		spec->data[spec->index++] = hierdis_port_get_redis_error(context->c.err);
-		spec->port->err_atom = hierdis_port_get_redis_error_string(context->c.err);
-	} else {
-		spec->data[spec->index++] = HI_ATOM(redis_err_other);
-		spec->port->err_atom = hierdis_port_get_redis_error_string(REDIS_ERR_OTHER);
-	}
-
-	spec->data[spec->index++] = ERL_DRV_STRING;
-
-	if (context->errstr) {
-		errstr = context->errstr;
-	} else if (context->c.errstr) {
-		errstr = spec->context->c.errstr;
-	} else {
-		errstr = "Unknown error";
-	}
-
-	errlen = strlen(errstr);
-
-	spec->data[spec->index++] = (ErlDrvTermData)(errstr);
-	spec->data[spec->index++] = errlen;
-	spec->data[spec->index++] = ERL_DRV_TUPLE;
-	spec->data[spec->index++] = 2;
-
-	return spec->index;
 }
 
 static int
