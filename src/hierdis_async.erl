@@ -184,7 +184,11 @@ command(Socket, CommandArgs) ->
 						{redis_reply, Socket, {error, RedisReplyError}} ->
 							{error, RedisReplyError};
 						{redis_reply, Socket, Reply} ->
-							{ok, Reply}
+							{ok, Reply};
+						{redis_error, Socket, RedisError} ->
+							{error, RedisError};
+						{redis_closed, Socket} ->
+							{error, closed}
 					end;
 				CommandError ->
 					CommandError
@@ -356,9 +360,9 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 priv_dir() ->
-	case code:priv_dir(?MODULE) of
+	case code:priv_dir(hierdis) of
 		{error, bad_name} ->
-			case code:which(hierdis) of
+			case code:which(?MODULE) of
 				Filename when is_list(Filename) ->
 					filename:join([filename:dirname(Filename), "../priv"]);
 				_ ->
