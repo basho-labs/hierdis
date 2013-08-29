@@ -55,4 +55,37 @@ run(delete, KeyGen, _ValueGen, #state{redis_context=Context}=State) ->
 			{ok, State};
 		{error, Reason} ->
 			{error, Reason, State}
+	end;
+
+run(pipeline_get, KeyGen, _ValueGen, #state{redis_context=Context,pipe_length=PipelineLength}=State) ->
+	Seq = lists:seq(1, PipelineLength),
+	Pipe = [[<<"GET">>, KeyGen()] || _ <- Seq],
+
+	case hierdis_async:pipeline(Context, Pipe) of
+		[_First|_Rest] ->
+			{ok, State};
+		{error, Reason} ->
+			{error, Reason, State}
+	end;
+
+run(pipeline_put, KeyGen, ValueGen, #state{redis_context=Context,pipe_length=PipelineLength}=State) ->
+	Seq = lists:seq(1, PipelineLength),
+	Pipe = [["SET", KeyGen(), ValueGen()] || _ <- Seq],
+
+	case hierdis_async:pipeline(Context, Pipe) of
+		[_First|_Rest] ->
+			{ok, State};
+		{error, Reason} ->
+			{error, Reason, State}
+	end;
+
+run(pipeline_delete, KeyGen, _ValueGen, #state{redis_context=Context,pipe_length=PipelineLength}=State) ->
+	Seq = lists:seq(1, PipelineLength),
+	Pipe = [[<<"DEL">>, KeyGen()] || _ <- Seq],
+
+	case hierdis_async:pipeline(Context, Pipe) of
+		[_First|_Rest] ->
+			{ok, State};
+		{error, Reason} ->
+			{error, Reason, State}
 	end.

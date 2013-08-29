@@ -32,10 +32,10 @@
 #include "hierdis_drv_common.h"
 #include "hiredis_erl_driver.h"
 
-#ifndef erl_drv_output_term
-#define HI_OUTPUT_TERM(SPEC)	driver_output_term(spec->port->drv_port, spec->data, spec->index)
+#if (ERL_DRV_EXTENDED_MAJOR_VERSION > 2 || (ERL_DRV_EXTENDED_MAJOR_VERSION == 2 && ERL_DRV_EXTENDED_MINOR_VERSION >= 1))
+#define HI_OUTPUT_TERM(SPEC)	erl_drv_output_term(SPEC->port->term_port, SPEC->data, SPEC->index)
 #else
-#define HI_OUTPUT_TERM(SPEC)	erl_drv_output_term(spec->port->term_port, spec->data, spec->index)
+#define HI_OUTPUT_TERM(SPEC)	driver_output_term(SPEC->port->drv_port, SPEC->data, SPEC->index)
 #endif
 
 typedef struct hierdis_port_spec {

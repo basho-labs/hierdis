@@ -31,7 +31,8 @@
 %% API
 -export([start_link/0]).
 -export([connect/2, connect/3, connect_unix/1, connect_unix/2, close/1,
-	command/2, append_command/2, controlling_process/2]).
+	command/2, pipeline/2, transaction/2, append_command/2, get_reply/1,
+	controlling_process/2]).
 -export([load/0, unload/0]).
 
 %% gen_server callbacks
@@ -170,26 +171,13 @@ close(Socket) ->
 	end.
 
 -spec command(Socket::port(), CommandArgs::iolist())
-	-> {atom(), binary()} | error().
+	-> {atom(), term()} | error().
 command(Socket, CommandArgs) ->
 	case controlling_process(Socket, self()) of
 		ok ->
 			try append_command(Socket, CommandArgs) of
 				{ok, _} ->
-					receive
-						{redis_message, Socket, {error, RedisMessageError}} ->
-							{error, RedisMessageError};
-						{redis_message, Socket, Message} ->
-							{ok, Message};
-						{redis_reply, Socket, {error, RedisReplyError}} ->
-							{error, RedisReplyError};
-						{redis_reply, Socket, Reply} ->
-							{ok, Reply};
-						{redis_error, Socket, RedisError} ->
-							{error, RedisError};
-						{redis_closed, Socket} ->
-							{error, closed}
-					end;
+					get_reply(Socket);
 				CommandError ->
 					CommandError
 			catch
@@ -201,14 +189,49 @@ command(Socket, CommandArgs) ->
 			ControlError
 	end.
 
+-spec pipeline(Socket::port(), CommandList::iolist())
+	-> {atom(), list(term())} | error().
+pipeline(Socket, CommandList) ->
+	case controlling_process(Socket, self()) of
+		ok ->
+			PipelineLength = pipe_builder(pipeline, Socket, CommandList, 0),
+			pipe_cleaner(pipeline, Socket, [], PipelineLength);
+		ControlError ->
+			ControlError
+	end.
+
+-spec transaction(Socket::port(), CommandList::iolist())
+	-> {atom(), list(term())} | error().
+transaction(Socket, CommandList) ->
+	TransactionLength = pipe_builder(transaction, Socket, CommandList, 0),
+	pipe_cleaner(transaction, Socket, [], TransactionLength).
+
 -spec append_command(Socket::port(), CommandArgs::iolist())
-	-> {atom(), binary()} | error().
+	-> {atom(), integer()} | error().
 append_command(Socket, CommandArgs) ->
 	case erlang:port_call(Socket, ?HIERDIS_CALL_COMMAND, CommandArgs) of
 		{ok, N} when is_integer(N) ->
 			{ok, N};
 		CommandError ->
 			{error, CommandError}
+	end.
+
+-spec get_reply(Socket::port())
+	-> {atom(), term()} | error().
+get_reply(Socket) ->
+	receive
+		{redis_message, Socket, {error, RedisMessageError}} ->
+			{error, RedisMessageError};
+		{redis_message, Socket, Message} ->
+			{ok, Message};
+		{redis_reply, Socket, {error, RedisReplyError}} ->
+			{error, RedisReplyError};
+		{redis_reply, Socket, Reply} ->
+			{ok, Reply};
+		{redis_error, Socket, RedisError} ->
+			{error, RedisError};
+		{redis_closed, Socket} ->
+			{error, closed}
 	end.
 
 -spec controlling_process(Socket::port(), Pid::pid())
@@ -235,28 +258,6 @@ controlling_process(Socket, NewOwner) when is_port(Socket), is_pid(NewOwner) ->
 							{error, Reason}
 					end
 			end
-	end.
-
-sync_input(Socket, Owner, Flag) ->
-	receive
-		{redis_closed, Socket} ->
-			Owner ! {redis_closed, Socket},
-			sync_input(Socket, Owner, true);
-		{redis_error, Socket, Reason} ->
-			Owner ! {redis_error, Socket, Reason},
-			sync_input(Socket, Owner, Flag);
-		{redis_message, Socket, Message} ->
-			Owner ! {redis_message, Socket, Message},
-			sync_input(Socket, Owner, Flag);
-		{redis_opened, Socket} ->
-			Owner ! {redis_opened, Socket},
-			sync_input(Socket, Owner, Flag);
-		{redis_reply, Socket, Reply} ->
-			Owner ! {redis_reply, Socket, Reply},
-			sync_input(Socket, Owner, Flag)
-	after
-		0 ->
-			Flag
 	end.
 
 %%--------------------------------------------------------------------
@@ -359,6 +360,28 @@ code_change(_OldVsn, State, _Extra) ->
 %%%-------------------------------------------------------------------
 
 %% @private
+pipe_builder(pipeline, _Socket, [], Counter) ->
+	Counter;
+pipe_builder(transaction, Socket, [Command|List], 0) ->
+	append_command(Socket, [?TRANSACTION_BEGIN]),
+	append_command(Socket, Command),
+	pipe_builder(transaction, Socket, List, 2);
+pipe_builder(transaction, Socket, [], Counter) ->
+	append_command(Socket, [?TRANSACTION_END]),
+	Counter+1;
+pipe_builder(Scheme, Socket, [Command|List], Counter) ->
+	append_command(Socket, Command),
+	pipe_builder(Scheme, Socket, List, Counter+1).
+
+%% @private
+pipe_cleaner(pipeline, _Socket, Acc, 0) ->
+	lists:reverse(Acc);
+pipe_cleaner(transaction, Socket, _Acc, 1) ->
+	get_reply(Socket);
+pipe_cleaner(Scheme, Socket, Acc, Counter) ->
+	pipe_cleaner(Scheme, Socket, [get_reply(Socket)|Acc], Counter-1).
+
+%% @private
 priv_dir() ->
 	case code:priv_dir(hierdis) of
 		{error, bad_name} ->
@@ -370,4 +393,27 @@ priv_dir() ->
 			end;
 		Dir ->
 			Dir
+	end.
+
+%% @private
+sync_input(Socket, Owner, Flag) ->
+	receive
+		{redis_closed, Socket} ->
+			Owner ! {redis_closed, Socket},
+			sync_input(Socket, Owner, true);
+		{redis_error, Socket, Reason} ->
+			Owner ! {redis_error, Socket, Reason},
+			sync_input(Socket, Owner, Flag);
+		{redis_message, Socket, Message} ->
+			Owner ! {redis_message, Socket, Message},
+			sync_input(Socket, Owner, Flag);
+		{redis_opened, Socket} ->
+			Owner ! {redis_opened, Socket},
+			sync_input(Socket, Owner, Flag);
+		{redis_reply, Socket, Reply} ->
+			Owner ! {redis_reply, Socket, Reply},
+			sync_input(Socket, Owner, Flag)
+	after
+		0 ->
+			Flag
 	end.
