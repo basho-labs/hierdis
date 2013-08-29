@@ -29,6 +29,7 @@
 #ifndef HIERDIS_DRV_COMMON_H
 #define HIERDIS_DRV_COMMON_H
 
+#include <sys/types.h>
 #include <erl_driver.h>
 #include <erl_interface.h>
 #include <unistd.h>
