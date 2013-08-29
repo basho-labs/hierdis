@@ -566,7 +566,7 @@ hierdis_port_respond(hierdis_port_t *port, redisReply *reply, int subscribed)
 static void
 hierdis_port_output(hierdis_port_spec_t *spec)
 {
-	switch (erl_drv_output_term(spec->port->term_port, spec->data, spec->index)) {
+	switch (HI_OUTPUT_TERM(spec)) {
 	case -1: // error in input data
 		(void) spec_free(spec);
 		HI_FAIL_BADSPEC(spec->port->drv_port);

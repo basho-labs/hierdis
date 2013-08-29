@@ -32,6 +32,12 @@
 #include "hierdis_drv_common.h"
 #include "hiredis_erl_driver.h"
 
+#ifndef erl_drv_output_term
+#define HI_OUTPUT_TERM(SPEC)	driver_output_term(spec->port->drv_port, spec->data, spec->index)
+#else
+#define HI_OUTPUT_TERM(SPEC)	erl_drv_output_term(spec->port->term_port, spec->data, spec->index)
+#endif
+
 typedef struct hierdis_port_spec {
 	ErlDrvSizeT		size;
 	ErlDrvTermData		*data;
