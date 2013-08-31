@@ -35,7 +35,6 @@
 #define HIERDIS_CALL_CONNECT		0
 #define HIERDIS_CALL_CONNECT_UNIX	1
 #define HIERDIS_CALL_COMMAND		2
-#define HIERDIS_CALL_DISCONNECT		3
 
 hierdis_call_t	*hierdis_call_new(hierdis_port_t *port, unsigned int command, char *buf, ErlDrvSizeT len, char *rbuf, ErlDrvSizeT rlen);
 void		hierdis_call_free(hierdis_call_t *call);
@@ -44,7 +43,6 @@ void		hierdis_call_execute(hierdis_call_t *call);
 static void	hierdis_call_connect(hierdis_call_t *call);
 static void	hierdis_call_connect_unix(hierdis_call_t *call);
 static void	hierdis_call_command(hierdis_call_t *call);
-static void	hierdis_call_disconnect(hierdis_call_t *call);
 
 static void	hierdis_call_attach(hierdis_call_t *call, int with_timeout, unsigned long timeout);
 

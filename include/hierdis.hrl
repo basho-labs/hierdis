@@ -28,4 +28,3 @@
 -define(HIERDIS_CALL_CONNECT,      0).
 -define(HIERDIS_CALL_CONNECT_UNIX, 1).
 -define(HIERDIS_CALL_COMMAND,      2).
--define(HIERDIS_CALL_DISCONNECT,   3).

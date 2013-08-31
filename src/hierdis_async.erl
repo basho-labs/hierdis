@@ -154,16 +154,15 @@ close(Socket) ->
 		_ ->
 			case controlling_process(Socket, self()) of
 				ok ->
-					case erlang:port_call(Socket, ?HIERDIS_CALL_DISCONNECT, 0) of
-						ok ->
-							receive
-								{redis_closed, Socket} ->
-									catch erlang:port_close(Socket),
-									self() ! {redis_closed, Socket},
-									ok
-							end;
-						CloseError ->
-							{error, CloseError}
+					receive
+						{redis_closed, Socket} -> % already closed
+							catch erlang:port_close(Socket),
+							self() ! {redis_closed, Socket},
+							ok
+					after
+						0 ->
+							catch erlang:port_close(Socket),
+							ok
 					end;
 				ControlError ->
 					ControlError

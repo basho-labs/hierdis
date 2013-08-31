@@ -38,7 +38,7 @@ hierdis_call_new(hierdis_port_t *port, unsigned int command, char *buf, ErlDrvSi
 		return (hierdis_call_t *)NULL;
 	}
 
-	call = driver_alloc(sizeof (hierdis_call_t));
+	call = (hierdis_call_t *)(driver_alloc(sizeof (hierdis_call_t)));
 	if (call == NULL) {
 		return call;
 	}
@@ -63,6 +63,7 @@ hierdis_call_free(hierdis_call_t *call)
 		return;
 	}
 	(void) driver_free(call);
+	call = NULL;
 }
 
 void
@@ -89,8 +90,7 @@ hierdis_call_execute(hierdis_call_t *call)
 			(void) hierdis_call_connect_unix(call);
 			break;
 		case HIERDIS_CALL_COMMAND:
-		case HIERDIS_CALL_DISCONNECT:
-			(void) hierdis_call_error(call, HI_STRING(redis_err_context), "USE: connect/2, connect/3, connect_unix/1, connect_unix/2, controlling_process/2");
+			(void) hierdis_call_error(call, HI_STRING(redis_err_context), "USE: connect/2, connect/3, connect_unix/1, connect_unix/2, close/1, controlling_process/2");
 			break;
 		default:
 			(void) hierdis_call_badarg(call);
@@ -104,9 +104,6 @@ hierdis_call_execute(hierdis_call_t *call)
 			break;
 		case HIERDIS_CALL_COMMAND:
 			(void) hierdis_call_command(call);
-			break;
-		case HIERDIS_CALL_DISCONNECT:
-			(void) hierdis_call_disconnect(call);
 			break;
 		default:
 			(void) hierdis_call_badarg(call);
@@ -282,34 +279,6 @@ hierdis_call_command(hierdis_call_t *call)
 	size_t hiredis_argv_lengths[hiredis_argc];
 
 	(void) hierdis_call_command_execute(call, hiredis_argc, hiredis_argv, hiredis_argv_lengths);
-}
-
-static void
-hierdis_call_disconnect(hierdis_call_t *call)
-{
-	int *length;
-	char *buffer;
-	int *index;
-
-	length = &(call->olen);
-	buffer = call->rbuf;
-	index = &(call->ridx);
-
-	if (call->port->context != NULL) {
-		(void) redisAsyncDisconnect(call->port->context);
-		call->port->context = NULL;
-	}
-
-	ei_encode_version(NULL, length);
-	ei_encode_atom(NULL, length, HI_STRING(ok));
-
-	if ((int)call->rlen < *length) {
-		buffer = (char *)driver_realloc((void *)buffer, (ErlDrvSizeT)*length);
-		call->rlen = (ErlDrvSizeT)*length;
-	}
-
-	ei_encode_version(buffer, index);
-	ei_encode_atom(buffer, index, HI_STRING(ok));
 }
 
 static void
