@@ -26,3 +26,4 @@ rel/hierdis.tar.bz2
 /rel/vars/dev*_vars.config
 /.hierdis.plt
 /c_src/hiredis/
+/.rebar-test

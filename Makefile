@@ -26,7 +26,7 @@ dialyzer_verbose = $(dialyzer_verbose_$(V))
 dialyzer = $(dialyzer_verbose) $(DIALYZER)
 
 .PHONY: deps compile build clean appclean distclean docs xref build-plt \
-	check-plt dialyze coverage ct eunit test-deps test-compile \
+	check-plt dialyze coverage ct eunit test-env test-deps test-compile \
 	test-build test-appclean test-clean test
 
 all: deps build
@@ -92,27 +92,30 @@ coverage: COVERAGE=1
 coverage: test
 
 ct: TEST=1
-ct:
+ct: test-env
 	$(rebar) skip_deps=true ct
 
 eunit: TEST=1
-eunit:
+eunit: test-env
 	$(rebar) skip_deps=true eunit
 
+test-env:
+	touch .rebar-test
+
 test-deps: TEST=1
-test-deps: deps
+test-deps: test-env deps
 
 test-compile: TEST=1 EUNIT_NOAUTO=1
-test-compile: compile
+test-compile: test-env compile
 
 test-build: TEST=1 EUNIT_NOAUTO=1
-test-build: build
+test-build: test-env build
 
 test-clean: TEST=1
-test-clean: clean
+test-clean: test-env clean
 
 test-appclean: TEST=1
-test-appclean: appclean
+test-appclean: test-env appclean
 
 test: test-clean test-deps test-build ct
 
