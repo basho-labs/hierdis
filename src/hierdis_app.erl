@@ -1,6 +1,9 @@
+%% -*- mode: erlang; tab-width: 4; indent-tabs-mode: 1; st-rulers: [70] -*-
+%% vim: ts=4 sw=4 ft=erlang noet
+
 % (The MIT License)
 
-% Copyright (c) 2013 Nathan Aschbacher
+% Copyright (c) 2013 Andrew Bennett
 
 % Permission is hereby granted, free of charge, to any person obtaining
 % a copy of this software and associated documentation files (the
@@ -21,10 +24,13 @@
 % TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 % SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
--type error() :: {error, {Code::atom(), Reason::string()}}.
--define(TRANSACTION_BEGIN, <<"MULTI">>).
--define(TRANSACTION_END, <<"EXEC">>).
+-module(hierdis_app).
+-author('Andrew Bennett <andrew@pagodabox.com>').
+-behaviour(application).
+-export([start/2, stop/1]).
 
--define(HIERDIS_CALL_CONNECT,      0).
--define(HIERDIS_CALL_CONNECT_UNIX, 1).
--define(HIERDIS_CALL_COMMAND,      2).
+start(_StartType, _StartArgs) ->
+	hierdis_sup:start_link().
+
+stop(_State) ->
+	ok.

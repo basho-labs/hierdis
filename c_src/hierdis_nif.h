@@ -73,5 +73,6 @@ void hiredis_context_handle_dtor(ErlNifEnv* env, void* arg);
 void hiredis_reply_handle_dtor(ErlNifEnv* env, void* arg);
 
 static int on_nif_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info);
+static int on_nif_upgrade(ErlNifEnv *env, void **priv_data, void **old_priv_data, ERL_NIF_TERM load_info);
 
 #endif

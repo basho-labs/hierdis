@@ -1,0 +1,50 @@
+%% -*- mode: erlang; tab-width: 4; indent-tabs-mode: 1; st-rulers: [70] -*-
+%% vim: ts=4 sw=4 ft=erlang noet
+
+ExtraDeps = [
+	{redis_test_server, ".*", {git, "git://github.com/potatosalad/redis_test_server.git", {tag, "0.0.3"}}}
+],
+ErlOpts = [
+	{d, 'TEST'},
+	{parse_transform, eunit_autoexport}
+],
+
+Merge = fun(Key, Val, Config) ->
+	case lists:keysearch(Key, 1, Config) of
+		{value, {Key, OldVal}} ->
+			NewVal = OldVal ++ Val,
+			lists:keyreplace(Key, 1, Config, {Key, NewVal});
+		false ->
+			Config ++ [{Key, Val}]
+	end
+end,
+
+ConfigPath = filename:dirname(SCRIPT),
+TestMarker = filename:join([ConfigPath, ".rebar-test"]),
+
+case filelib:is_file(TestMarker) of
+	true ->
+		Config2 = case os:getenv("COVERAGE") of
+			C when C =:= false; C =:= "0" ->
+				CONFIG;
+			_ ->
+				lists:keystore(cover_enabled, 1, CONFIG, {cover_enabled, true})
+		end,
+
+		case os:getenv("TEST") of
+			F when F =:= false; F =:= "0" ->
+				Config2;
+			_ ->
+				lists:foldl(fun({Key, Val}, Config) ->
+					Merge(Key, Val, Config)
+				end, Config2, [
+					{deps, ExtraDeps},
+					{erl_opts, ErlOpts},
+					{clean_files, ["logs", "test/*.beam"]},
+					{post_hooks, [{compile, "make -C test"}]},
+					{lib_dirs, ["test"]}
+				])
+		end;
+	false ->
+		CONFIG
+end.

@@ -392,4 +392,9 @@ static int on_nif_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     return 0;
 }
 
-ERL_NIF_INIT(hierdis, nif_funcs, on_nif_load, NULL, NULL, NULL);
+static int on_nif_upgrade(ErlNifEnv *env, void **priv_data, void **old_priv_data, ERL_NIF_TERM load_info)
+{
+    return 0;
+}
+
+ERL_NIF_INIT(hierdis, nif_funcs, on_nif_load, NULL, on_nif_upgrade, NULL);
